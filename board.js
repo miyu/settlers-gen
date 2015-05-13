@@ -21,8 +21,18 @@ kTileColors[4 /* Clay */] = "#FF9100";
 kTileColors[5 /* Sheep */] = "#BBFF00";
 kTileColors[6 /* Ore */] = "#D1D1D1";
 kTileColors[7 /* Wheat */] = "#FFFF00";
+var kTileLetters = [];
+kTileLetters[0 /* Water */] = "w";
+kTileLetters[1 /* Desert */] = "d";
+kTileLetters[2 /* Gold */] = "G";
+kTileLetters[3 /* Wood */] = "W";
+kTileLetters[4 /* Clay */] = "C";
+kTileLetters[5 /* Sheep */] = "S";
+kTileLetters[6 /* Ore */] = "O";
+kTileLetters[7 /* Wheat */] = "H";
+var kWeightsByNumber = [0, 0, 1, 2, 3, 4, 5, 0, 5, 4, 3, 2, 1, 0];
 var allTileTypes = [0 /* Water */, 1 /* Desert */, 3 /* Wood */, 4 /* Clay */, 5 /* Sheep */, 6 /* Ore */, 7 /* Wheat */];
-var interiorTileTypes = [1 /* Desert */, 3 /* Wood */, 4 /* Clay */, 5 /* Sheep */, 6 /* Ore */, 7 /* Wheat */];
+var interiorTileTypes = [1 /* Desert */, 2 /* Gold */, 3 /* Wood */, 4 /* Clay */, 5 /* Sheep */, 6 /* Ore */, 7 /* Wheat */];
 var resourceTileTypes = [3 /* Wood */, 4 /* Clay */, 5 /* Sheep */, 6 /* Ore */, 7 /* Wheat */];
 var GridLocation = (function () {
     function GridLocation(x, y, z) {
@@ -235,13 +245,20 @@ var BoardRenderer = (function () {
         this.context.setTransform(1, 0, 0, 1, 1000, 550);
         this.context.fillStyle = "#000000";
         var tilesByNumber = {};
+        var tilesByType = {};
         board.forEachInterior(function (tile) {
             var tileNumber = tile.getNumber();
+            var tileType = tile.getType();
             if (typeof (tilesByNumber[tileNumber]) === "undefined") {
                 tilesByNumber[tileNumber] = [];
             }
-            var group = tilesByNumber[tileNumber];
-            group.push(tile);
+            if (typeof (tilesByType[tileType]) === "undefined") {
+                tilesByType[tileType] = [];
+            }
+            var numberGroup = tilesByNumber[tileNumber];
+            numberGroup.push(tile);
+            var typeGroup = tilesByType[tileType];
+            typeGroup.push(tile);
         });
         for (var i = 2; i <= 12; i++) {
             var fontSize = 20;
@@ -270,7 +287,42 @@ var BoardRenderer = (function () {
                 }
             }
         }
+        var maximumTypeCount = 1; // can't be 0 or div by 0
+        for (var i = 0; i < interiorTileTypes.length; i++) {
+            if (tilesByType[interiorTileTypes[i]]) {
+                var group = tilesByType[interiorTileTypes[i]];
+                var frequencySum = 0;
+                for (var j = 0; j < group.length; j++) {
+                    var tile = group[j];
+                    frequencySum += kWeightsByNumber[tile.getNumber()];
+                }
+                if (maximumTypeCount < frequencySum) {
+                    maximumTypeCount = frequencySum;
+                }
+            }
+        }
         this.context.setTransform(1, 0, 0, 1, 1100, 500);
+        var typeFrequencyGraphHeight = 100;
+        this.context.fillStyle = "#444444";
+        this.context.fillRect(0, 0, 100, typeFrequencyGraphHeight);
+        for (var i = 0; i < interiorTileTypes.length; i++) {
+            var fontSize = 20;
+            this.context.fillStyle = "#000000";
+            this.context.textAlign = 'left';
+            var tileType = interiorTileTypes[i];
+            var group = tilesByType[tileType] || [];
+            var groupSum = 0;
+            for (var j = 0; j < group.length; j++) {
+                groupSum += kWeightsByNumber[group[j].getNumber()];
+            }
+            if (groupSum > maximumTypeCount) {
+                alert("! " + groupSum + " " + maximumTypeCount);
+            }
+            this.context.fillStyle = kTileColors[tileType];
+            var blockHeight = typeFrequencyGraphHeight * (groupSum / maximumTypeCount);
+            this.context.fillRect(10 * i, typeFrequencyGraphHeight - blockHeight, 10, blockHeight);
+        }
+        this.context.setTransform(1, 0, 0, 1, 1100, 650);
         scrollingGraph.render(this.context, 0, 0, 200, 100);
         board.forEach(function (hex) {
             var position = hex.getPosition();
@@ -298,7 +350,6 @@ var BoardRenderer = (function () {
                 _this.context.stroke();
             }
             // Draw tiles lit by probability
-            var kWeightsByNumber = [0, 0, 1, 2, 3, 4, 5, 0, 5, 4, 3, 2, 1, 0];
             var weight = kWeightsByNumber[hex.getNumber()];
             var colorHex = (~~(255 * weight / 5)).toString(16);
             if (colorHex.length === 1)
@@ -498,31 +549,30 @@ var MapGenerator = (function () {
         */
         var multiplier = 1;
         if (aType === bType) {
-            var stackBase = 2; //0.5;
             if (aType === 2 /* Gold */) {
-                multiplier = 100.0 + stackBase;
+                multiplier = 100.0;
             }
             else if (aType === 3 /* Wood */) {
-                multiplier = -0.5 + stackBase;
+                multiplier = 1.8;
             }
             else if (aType === 5 /* Sheep */) {
-                multiplier = 0.8 + stackBase;
+                multiplier = 2.8;
             }
             else if (aType === 7 /* Wheat */) {
-                multiplier = 1.2 + stackBase;
+                multiplier = 2.5;
             }
             else if (aType === 6 /* Ore */) {
-                multiplier = 1.2 + stackBase;
+                multiplier = 2.8;
             }
             else if (aType === 4 /* Clay */) {
-                multiplier = 1.2 + stackBase;
+                multiplier = 1.8;
             }
         }
         else if (aType === 3 /* Wood */ && bType === 4 /* Clay */) {
-            multiplier = 2.0;
+            multiplier = 1.8;
         }
         else if (aType === 6 /* Ore */ && bType === 7 /* Wheat */) {
-            multiplier = 2.0;
+            multiplier = 1.8;
         }
         else if (aType === 1 /* Desert */) {
             multiplier = 0.0;
@@ -533,8 +583,8 @@ var MapGenerator = (function () {
         else if (aType === 2 /* Gold */) {
             multiplier = 1.2;
         }
-        else if (aType === 3 /* Wood */) {
-            multiplier = 0.8;
+        else if (aType === 5 /* Sheep */ && (bType === 7 /* Wheat */ || bType === 6 /* Ore */)) {
+            multiplier = 1.2;
         }
         if (a.getNumber() === b.getNumber() && distance === 1) {
             multiplier *= 20;
