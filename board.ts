@@ -21,10 +21,22 @@ kTileColors[TileType.Wood]   = "#39AD43";
 kTileColors[TileType.Clay]   = "#FF9100";
 kTileColors[TileType.Sheep]  = "#BBFF00";
 kTileColors[TileType.Ore]    = "#D1D1D1";
-kTileColors[TileType.Wheat]  = "#FFFF00";
+kTileColors[TileType.Wheat] = "#FFFF00";
+
+var kTileLetters = [];
+kTileLetters[TileType.Water] = "w";
+kTileLetters[TileType.Desert] = "d";
+kTileLetters[TileType.Gold] = "G";
+kTileLetters[TileType.Wood] = "W";
+kTileLetters[TileType.Clay] = "C";
+kTileLetters[TileType.Sheep] = "S";
+kTileLetters[TileType.Ore] = "O";
+kTileLetters[TileType.Wheat] = "H";
+
+var kWeightsByNumber = [0, 0, 1, 2, 3, 4, 5, 0, 5, 4, 3, 2, 1, 0];
 
 var allTileTypes = [TileType.Water, TileType.Desert, TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
-var interiorTileTypes = [TileType.Desert, TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
+var interiorTileTypes = [TileType.Desert, TileType.Gold, TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
 var resourceTileTypes = [TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
 
 class GridLocation {
@@ -225,14 +237,21 @@ class BoardRenderer {
       this.context.setTransform(1, 0, 0, 1, 1000, 550);
       this.context.fillStyle = "#000000";
       var tilesByNumber = {};
+      var tilesByType = {};
       board.forEachInterior(
          tile => {
             var tileNumber = tile.getNumber();
-            if (typeof(tilesByNumber[tileNumber]) === "undefined") {
+            var tileType = tile.getType();
+            if (typeof (tilesByNumber[tileNumber]) === "undefined") {
                tilesByNumber[tileNumber] = [];
             }
-            var group = tilesByNumber[tileNumber];
-            group.push(tile);
+            if (typeof (tilesByType[tileType]) === "undefined") {
+               tilesByType[tileType] = [];
+            }
+            var numberGroup = tilesByNumber[tileNumber];
+            numberGroup.push(tile);
+            var typeGroup = tilesByType[tileType];
+            typeGroup.push(tile);
          }
       )
       for (var i = 2; i <= 12; i++) {
@@ -260,8 +279,48 @@ class BoardRenderer {
             }
          }
       }
+      
+      var maximumTypeCount = 1; // can't be 0 or div by 0
+      for (var i = 0; i < interiorTileTypes.length; i++) {
+         if (tilesByType[interiorTileTypes[i]]) {
+            var group = tilesByType[interiorTileTypes[i]];
+            var frequencySum = 0;
+            for (var j = 0; j < group.length; j++) {
+               var tile = group[j];
+               frequencySum += kWeightsByNumber[tile.getNumber()];
+            }
+            if (maximumTypeCount < frequencySum) {
+               maximumTypeCount = frequencySum;
+            }
+         }
+      }
 
       this.context.setTransform(1, 0, 0, 1, 1100, 500);
+      var typeFrequencyGraphHeight = 100;
+      this.context.fillStyle = "#444444";
+      this.context.fillRect(0, 0, 100, typeFrequencyGraphHeight);
+      for (var i = 0; i < interiorTileTypes.length; i++) {
+         var fontSize = 20;
+         this.context.fillStyle = "#000000";
+         this.context.textAlign = 'left';
+
+         var tileType = interiorTileTypes[i];
+         var group = tilesByType[tileType] || [];
+         var groupSum = 0;
+         for (var j = 0; j < group.length; j++) {
+            groupSum += kWeightsByNumber[group[j].getNumber()];
+         }
+
+         if (groupSum > maximumTypeCount) {
+            alert("! " + groupSum + " " + maximumTypeCount);
+         }
+
+         this.context.fillStyle = kTileColors[tileType];
+         var blockHeight = typeFrequencyGraphHeight * (groupSum / maximumTypeCount);
+         this.context.fillRect(10 * i, typeFrequencyGraphHeight - blockHeight, 10, blockHeight);
+      }
+
+      this.context.setTransform(1, 0, 0, 1, 1100, 650);
       scrollingGraph.render(this.context, 0, 0, 200, 100);
 
       board.forEach(
@@ -294,7 +353,6 @@ class BoardRenderer {
             }
 
             // Draw tiles lit by probability
-            var kWeightsByNumber = [0, 0, 1, 2, 3, 4, 5, 0, 5, 4, 3, 2, 1, 0];
             var weight = kWeightsByNumber[hex.getNumber()];
             var colorHex = (~~(255 * weight / 5)).toString(16);
             if (colorHex.length === 1) colorHex = "0" + colorHex;
