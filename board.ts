@@ -394,7 +394,8 @@ class MapGenerator {
       var first = interiorTiles[~~(Math.random() * interiorTiles.length)];
       var second = interiorTiles[~~(Math.random() * interiorTiles.length)];
 
-      if (first.getType() === TileType.Water || second.getType() === TileType.Water) {
+      if (first.getType() === TileType.Water || second.getType() === TileType.Water || 
+          first.getType() === TileType.Desert || second.getType() === TileType.Desert) {
          return;
       }
 
@@ -409,6 +410,12 @@ class MapGenerator {
 
       if (first.getType() === TileType.Water || second.getType() === TileType.Water) {
          return;
+      }
+
+      if (first.getType() === TileType.Desert || second.getType() === TileType.Desert) {
+         var firstValue = first.getNumber();
+         first.setNumber(second.getNumber());
+         second.setNumber(firstValue);
       }
 
       var temp = first.getType();
