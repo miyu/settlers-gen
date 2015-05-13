@@ -464,7 +464,7 @@ class MapGenerator {
          if (aType === TileType.Gold) {
             multiplier = 100.0 + stackBase;
          } else if (aType === TileType.Wood) {
-            multiplier = 0.8 + stackBase;
+            multiplier = -0.5 + stackBase;
          } else if (aType === TileType.Sheep) {
             multiplier = 0.8 + stackBase;
          } else if (aType === TileType.Wheat) {
@@ -478,16 +478,19 @@ class MapGenerator {
          multiplier = 2.0;
       } else if (aType === TileType.Ore && bType === TileType.Wheat) {
          multiplier = 2.0;
-      }
-      if (aType === TileType.Desert) {
+      } else if (aType === TileType.Desert) {
          multiplier = 0.0;
-      }
-      if (aType === TileType.Water) {
+      } else if (aType === TileType.Water) {
          multiplier = 3;
 //         multiplier = 8.0;
+      } else if (aType === TileType.Gold) {
+         multiplier = 1.2;
+      } else if (aType === TileType.Wood) {
+         multiplier = 0.8;
       }
-      if (aType === TileType.Gold) {
-         multiplier = 6;
+
+      if (a.getNumber() === b.getNumber() && distance === 1) {
+         multiplier *= 20;
       }
       return 1 + multiplier * weight;
    }
