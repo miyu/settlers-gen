@@ -278,50 +278,68 @@ class BoardRenderer {
 
 class MapGenerator {
    public randomizeBoard(board: Board, interiorWaterFraction: number = 0.0): void {
+      var desertCount = 2;
       var interiorTileCount = 0;
       board.forEachInterior(tile => interiorTileCount++);
       board.forEach(tile => { if (tile.isBoundary()) tile.setType(TileType.Water); });
-      
+      var waterTileCount = ~~(interiorWaterFraction * interiorTileCount);
+      var nonwaterTileCount = interiorTileCount - waterTileCount;
+      var resourceTileCount = interiorTileCount - waterTileCount - desertCount;
+
+      var numberNormalize = 0.8;
       var numbers = [];
-      var types = [];
-      for (var i = 0; i < interiorTileCount * 1.5; i++) {
+      for (var i = 0; i < ~~(resourceTileCount * numberNormalize); i++) {
          var number = i % 10 + 2;
-         if (number >= 7) number ++;
+         if (number >= 7) number++;
          numbers.push(number);
       }
 
-      var normalize = 0.5;
+      while (numbers.length < resourceTileCount) {
+         var number = ~~(Math.random() * 10) + 2;
+         if (number >= 7) number++;
+         numbers.push(number);
+      }
+      if (numbers.length != resourceTileCount) {
+         throw new Error("Check number distribution code: " + numbers.length + " " + resourceTileCount);
+      }
+
+      var types = [TileType.Desert, TileType.Desert, TileType.Gold, TileType.Gold, TileType.Gold];
+      var typeNormalize = 0.8;
+      var requiredTilesPerType = ~~(typeNormalize * (nonwaterTileCount - types.length) / resourceTileTypes.length);
       for (var i = 0; i < resourceTileTypes.length; i++) {
-         for (var j = 0; j < (interiorTileCount / resourceTileTypes.length) * normalize; j++) {
+         for (var j = 0; j < requiredTilesPerType; j++) {
             types.push(resourceTileTypes[i]);
          }
       }
-      while (types.length < interiorTileCount) {
+      while (types.length < nonwaterTileCount) {
          types.push(resourceTileTypes[~~(Math.random() * resourceTileTypes.length)]);
       }
 
+      if (types.length != nonwaterTileCount) {
+         throw new Error("Check nonwater distribution code: " + types.length + " " + nonwaterTileCount);
+      }
+
+
       shuffle(numbers);
       shuffle(types);
-      for (var i = 0; i < interiorWaterFraction * interiorTileCount; i++) {
-         types.shift();
+      for (var i = 0; i < waterTileCount; i++) {
          types.push(TileType.Water);
       }
-      types.shift();
-      types.shift();
-      types.shift();
-      types.shift();
-      types.shift();
-      types.push(TileType.Desert);
-      types.push(TileType.Desert);
-      types.push(TileType.Gold);
-      types.push(TileType.Gold);
-      types.push(TileType.Gold);
       shuffle(types);
       
+      if (types.length != interiorTileCount) {
+         throw new Error("Check distribution code: " + types.length + " " + interiorTileCount);
+      }
+
+      var numberIndex = 0;
       board.forEachInterior(
          (tile, i) => {
             tile.setType(types[i]);
-            tile.setNumber(numbers[i]);
+            if (types[i] === TileType.Water || types[i] === TileType.Desert) {
+               tile.setNumber(0);
+            } else {
+               tile.setNumber(numbers[numberIndex++]);
+            }
          });
    }
 
