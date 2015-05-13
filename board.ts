@@ -212,7 +212,16 @@ class BoardRenderer {
       
    }
 
-   public render(board: Board): void {
+   public render(board: Board, iterations: number): void {
+      this.context.setTransform(1, 0, 0, 1, 0, 0);
+      this.context.clearRect(0, 0, 100, 50);
+      var fontSize = 20;
+      this.context.fillStyle = "#000000";
+      this.context.font = fontSize + "px 'segoe ui'";
+      this.context.textAlign = 'left';
+      this.context.fillText(iterations.toString(), 10, fontSize);
+      this.context.stroke();
+
       board.forEach(
          (hex) => {
             var position = hex.getPosition();
@@ -472,15 +481,16 @@ class Application {
       var mapGenerator = new MapGenerator();
       mapGenerator.randomizeBoard(board, 0.5);
       var boardRenderer = new BoardRenderer(this.canvas, this.context);
-      board = mapGenerator.iterateBoard(board, 5000);
-      boardRenderer.render(board);
 
+      var iterations = 0;
       g.board = board;
-//      setInterval(
-//         function() {
-//            board = mapGenerator.iterateBoard(board, 10);
-//            boardRenderer.render(board);
-//         }, 10);
+      setInterval(
+         function() {
+            var iterationsPerFrame = 10;
+            board = mapGenerator.iterateBoard(board, iterationsPerFrame);
+            iterations += iterationsPerFrame;
+            boardRenderer.render(board, iterations);
+         }, 1);
    }
 }
 
