@@ -212,7 +212,7 @@ class BoardRenderer {
       
    }
 
-   public render(board: Board, iterations: number): void {
+   public render(board: Board, iterations: number, scrollingGraph: SlidingGraph): void {
       this.context.setTransform(1, 0, 0, 1, 0, 0);
       this.context.clearRect(0, 0, 100, 50);
       var fontSize = 20;
@@ -260,6 +260,9 @@ class BoardRenderer {
             }
          }
       }
+
+      this.context.setTransform(1, 0, 0, 1, 1100, 500);
+      scrollingGraph.render(this.context, 0, 0, 200, 100);
 
       board.forEach(
          (hex) => {
@@ -313,6 +316,13 @@ class BoardRenderer {
          }, this
       );
    }
+}
+
+class IterationResult {
+   constructor(
+      public board: Board,
+      public score: number
+   ) { }
 }
 
 class MapGenerator {
@@ -399,7 +409,7 @@ class MapGenerator {
       return edgeTiles;
    }
    
-   public iterateBoard(board: Board, iterations: number = 10): Board {
+   public iterateBoard(board: Board, iterations: number = 10): IterationResult {
       var initialTiles = board.getTiles();
       var edgeTiles = this.getBoardEdgeTiles(board);
       var initialScore = this.scoreBoard(board, initialTiles);
@@ -418,7 +428,7 @@ class MapGenerator {
       }
 
       console.log("Iterated from " + initialScore + " to " + bestScore);
-      return board;
+      return new IterationResult(board, bestScore);
    }
 
    public iterateBoardDispatcher(board: Board, interiorTiles: Array<Hex>) {
@@ -535,6 +545,50 @@ class MapGenerator {
    }
 }
 
+class SlidingGraph {
+   private canvas: any;
+   private context: any;
+   private currentX: number = 0;
+   private scale: number = 1;
+   private isSliding: boolean = false;
+
+   constructor(private width: number, private height: number) {
+      this.canvas = document.createElement("canvas");
+      this.canvas.width = width + "";
+      this.canvas.height = width + "";
+      this.context = this.canvas.getContext("2d");
+   }
+
+   public push(value: number) {
+      if (value > this.scale) {
+         var ratio = this.scale / value;
+         var rescaledHeight = ~~(this.height * ratio);
+         this.context.drawImage(this.canvas, 0, this.height - rescaledHeight, this.width, rescaledHeight);
+         this.scale = value;
+      }
+      
+      this.context.fillStyle = "#FFFFFF"
+      this.context.fillRect(this.currentX, 0, 1, this.height);
+      var renderedHeight = this.height * (value / this.scale);
+      this.context.fillStyle = "#000000";
+      this.context.fillRect(this.currentX, this.height - renderedHeight, 1, renderedHeight);
+      this.currentX++;
+      if (this.currentX > this.width) {
+         this.currentX = 0;
+         this.isSliding = true;
+      }
+   }
+
+   public render(ctx, x, y, w, h) {
+      if (!this.isSliding) {
+         ctx.drawImage(this.canvas, 0, 0, this.width, this.height, x, y, w, h);
+      } else {
+         ctx.drawImage(this.canvas, this.currentX + 1, 0, this.width - this.currentX - 1, this.height, x, y, w * (this.width - this.currentX) / this.width, h); // * (1 - (this.currentX / this.width)), h);
+         ctx.drawImage(this.canvas, 0, 0, this.currentX, this.height, x + w * (this.width - this.currentX) / this.width, y, w * (this.currentX / this.width), h);
+      }
+   }
+}
+
 class Application {
    private context: any;
 
@@ -548,15 +602,18 @@ class Application {
       var mapGenerator = new MapGenerator();
       mapGenerator.randomizeBoard(board, 0.5);
       var boardRenderer = new BoardRenderer(this.canvas, this.context);
+      var scrollingGraph = new SlidingGraph(200, 100);
 
       var iterations = 0;
       g.board = board;
       setInterval(
          function() {
             var iterationsPerFrame = 10;
-            board = mapGenerator.iterateBoard(board, iterationsPerFrame);
+            var iterationResult = mapGenerator.iterateBoard(board, iterationsPerFrame);
+            board = iterationResult.board;
+            scrollingGraph.push(iterationResult.score);
             iterations += iterationsPerFrame;
-            boardRenderer.render(board, iterations);
+            boardRenderer.render(board, iterations, scrollingGraph);
          }, 1);
    }
 }
