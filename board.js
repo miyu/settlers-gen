@@ -232,6 +232,44 @@ var BoardRenderer = (function () {
         this.context.textAlign = 'left';
         this.context.fillText(iterations.toString(), 10, fontSize);
         this.context.stroke();
+        this.context.setTransform(1, 0, 0, 1, 1000, 550);
+        this.context.fillStyle = "#000000";
+        var tilesByNumber = {};
+        board.forEachInterior(function (tile) {
+            var tileNumber = tile.getNumber();
+            if (typeof (tilesByNumber[tileNumber]) === "undefined") {
+                tilesByNumber[tileNumber] = [];
+            }
+            var group = tilesByNumber[tileNumber];
+            group.push(tile);
+        });
+        for (var i = 2; i <= 12; i++) {
+            var fontSize = 20;
+            this.context.fillStyle = "#000000";
+            this.context.textAlign = 'right';
+            var rowY = fontSize * (i - 2);
+            this.context.fillText(i.toString(), 0, rowY);
+            this.context.stroke();
+            var group = tilesByNumber[i] || [];
+            if (group) {
+                group.sort(function (a, b) {
+                    if (a.getType() < b.getType()) {
+                        return -1;
+                    }
+                    else if (a.getType() > b.getType()) {
+                        return 1;
+                    }
+                    else {
+                        return 0;
+                    }
+                });
+                for (var j = 0; j < group.length; j++) {
+                    var tile = group[j];
+                    this.context.fillStyle = kTileColors[tile.getType()];
+                    this.context.fillRect(5 + j * 12, rowY - (fontSize - 10), 10, 10);
+                }
+            }
+        }
         board.forEach(function (hex) {
             var position = hex.getPosition();
             var screenCoordinates = position.toScreenCoordinates();
