@@ -222,8 +222,16 @@ var BoardRenderer = (function () {
         this.canvas = canvas;
         this.context = context;
     }
-    BoardRenderer.prototype.render = function (board) {
+    BoardRenderer.prototype.render = function (board, iterations) {
         var _this = this;
+        this.context.setTransform(1, 0, 0, 1, 0, 0);
+        this.context.clearRect(0, 0, 100, 50);
+        var fontSize = 20;
+        this.context.fillStyle = "#000000";
+        this.context.font = fontSize + "px 'segoe ui'";
+        this.context.textAlign = 'left';
+        this.context.fillText(iterations.toString(), 10, fontSize);
+        this.context.stroke();
         board.forEach(function (hex) {
             var position = hex.getPosition();
             var screenCoordinates = position.toScreenCoordinates();
@@ -278,49 +286,65 @@ var MapGenerator = (function () {
     }
     MapGenerator.prototype.randomizeBoard = function (board, interiorWaterFraction) {
         if (interiorWaterFraction === void 0) { interiorWaterFraction = 0.0; }
+        var desertCount = 2;
         var interiorTileCount = 0;
         board.forEachInterior(function (tile) { return interiorTileCount++; });
         board.forEach(function (tile) {
             if (tile.isBoundary())
                 tile.setType(0 /* Water */);
         });
+        var waterTileCount = ~~(interiorWaterFraction * interiorTileCount);
+        var nonwaterTileCount = interiorTileCount - waterTileCount;
+        var resourceTileCount = interiorTileCount - waterTileCount - desertCount;
+        var numberNormalize = 0.8;
         var numbers = [];
-        var types = [];
-        for (var i = 0; i < interiorTileCount * 1.5; i++) {
+        for (var i = 0; i < ~~(resourceTileCount * numberNormalize); i++) {
             var number = i % 10 + 2;
             if (number >= 7)
                 number++;
             numbers.push(number);
         }
-        var normalize = 0.5;
+        while (numbers.length < resourceTileCount) {
+            var number = ~~(Math.random() * 10) + 2;
+            if (number >= 7)
+                number++;
+            numbers.push(number);
+        }
+        if (numbers.length != resourceTileCount) {
+            throw new Error("Check number distribution code: " + numbers.length + " " + resourceTileCount);
+        }
+        var types = [1 /* Desert */, 1 /* Desert */, 2 /* Gold */, 2 /* Gold */, 2 /* Gold */];
+        var typeNormalize = 0.8;
+        var requiredTilesPerType = ~~(typeNormalize * (nonwaterTileCount - types.length) / resourceTileTypes.length);
         for (var i = 0; i < resourceTileTypes.length; i++) {
-            for (var j = 0; j < (interiorTileCount / resourceTileTypes.length) * normalize; j++) {
+            for (var j = 0; j < requiredTilesPerType; j++) {
                 types.push(resourceTileTypes[i]);
             }
         }
-        while (types.length < interiorTileCount) {
+        while (types.length < nonwaterTileCount) {
             types.push(resourceTileTypes[~~(Math.random() * resourceTileTypes.length)]);
+        }
+        if (types.length != nonwaterTileCount) {
+            throw new Error("Check nonwater distribution code: " + types.length + " " + nonwaterTileCount);
         }
         shuffle(numbers);
         shuffle(types);
-        for (var i = 0; i < interiorWaterFraction * interiorTileCount; i++) {
-            types.shift();
+        for (var i = 0; i < waterTileCount; i++) {
             types.push(0 /* Water */);
         }
-        types.shift();
-        types.shift();
-        types.shift();
-        types.shift();
-        types.shift();
-        types.push(1 /* Desert */);
-        types.push(1 /* Desert */);
-        types.push(2 /* Gold */);
-        types.push(2 /* Gold */);
-        types.push(2 /* Gold */);
         shuffle(types);
+        if (types.length != interiorTileCount) {
+            throw new Error("Check distribution code: " + types.length + " " + interiorTileCount);
+        }
+        var numberIndex = 0;
         board.forEachInterior(function (tile, i) {
             tile.setType(types[i]);
-            tile.setNumber(numbers[i]);
+            if (types[i] === 0 /* Water */ || types[i] === 1 /* Desert */) {
+                tile.setNumber(0);
+            }
+            else {
+                tile.setNumber(numbers[numberIndex++]);
+            }
         });
     };
     MapGenerator.prototype.getBoardEdgeTiles = function (board) {
@@ -341,15 +365,16 @@ var MapGenerator = (function () {
     };
     MapGenerator.prototype.iterateBoard = function (board, iterations) {
         if (iterations === void 0) { iterations = 10; }
-        var initialInteriorTiles = board.getTiles();
+        var initialTiles = board.getTiles();
         var edgeTiles = this.getBoardEdgeTiles(board);
-        var initialScore = this.scoreBoard(board, initialInteriorTiles);
+        var initialScore = this.scoreBoard(board, initialTiles);
         var bestScore = initialScore;
         for (var i = 0; i < iterations; i++) {
             var clone = board.clone();
-            var cloneInteriorTiles = clone.getTiles();
+            var cloneTiles = clone.getTiles();
+            var cloneInteriorTiles = clone.getInteriorTiles();
             this.iterateBoardDispatcher(clone, cloneInteriorTiles);
-            var cloneScore = this.scoreBoard(clone, cloneInteriorTiles);
+            var cloneScore = this.scoreBoard(clone, cloneTiles);
             if (cloneScore < bestScore) {
                 board = clone;
                 bestScore = cloneScore;
@@ -368,7 +393,7 @@ var MapGenerator = (function () {
     MapGenerator.prototype.iterateBoardSwapNumbers = function (board, interiorTiles) {
         var first = interiorTiles[~~(Math.random() * interiorTiles.length)];
         var second = interiorTiles[~~(Math.random() * interiorTiles.length)];
-        if (first.getType() === 0 /* Water */ || second.getType() === 0 /* Water */) {
+        if (first.getType() === 0 /* Water */ || second.getType() === 0 /* Water */ || first.getType() === 1 /* Desert */ || second.getType() === 1 /* Desert */) {
             return;
         }
         var temp = first.getNumber();
@@ -380,6 +405,11 @@ var MapGenerator = (function () {
         var second = interiorTiles[~~(Math.random() * interiorTiles.length)];
         if (first.getType() === 0 /* Water */ || second.getType() === 0 /* Water */) {
             return;
+        }
+        if (first.getType() === 1 /* Desert */ || second.getType() === 1 /* Desert */) {
+            var firstValue = first.getNumber();
+            first.setNumber(second.getNumber());
+            second.setNumber(firstValue);
         }
         var temp = first.getType();
         first.setType(second.getType());
@@ -426,7 +456,7 @@ var MapGenerator = (function () {
                 multiplier = 100.0 + stackBase;
             }
             else if (aType === 3 /* Wood */) {
-                multiplier = 0.8 + stackBase;
+                multiplier = -0.5 + stackBase;
             }
             else if (aType === 5 /* Sheep */) {
                 multiplier = 0.8 + stackBase;
@@ -447,14 +477,20 @@ var MapGenerator = (function () {
         else if (aType === 6 /* Ore */ && bType === 7 /* Wheat */) {
             multiplier = 2.0;
         }
-        if (aType === 1 /* Desert */) {
+        else if (aType === 1 /* Desert */) {
             multiplier = 0.0;
         }
-        if (aType === 0 /* Water */) {
+        else if (aType === 0 /* Water */) {
             multiplier = 3;
         }
-        if (aType === 2 /* Gold */) {
-            multiplier = 6;
+        else if (aType === 2 /* Gold */) {
+            multiplier = 1.2;
+        }
+        else if (aType === 3 /* Wood */) {
+            multiplier = 0.8;
+        }
+        if (a.getNumber() === b.getNumber() && distance === 1) {
+            multiplier *= 20;
         }
         return 1 + multiplier * weight;
     };
@@ -471,14 +507,14 @@ var Application = (function () {
         var mapGenerator = new MapGenerator();
         mapGenerator.randomizeBoard(board, 0.5);
         var boardRenderer = new BoardRenderer(this.canvas, this.context);
-        board = mapGenerator.iterateBoard(board, 5000);
-        boardRenderer.render(board);
+        var iterations = 0;
         g.board = board;
-        //      setInterval(
-        //         function() {
-        //            board = mapGenerator.iterateBoard(board, 10);
-        //            boardRenderer.render(board);
-        //         }, 10);
+        setInterval(function () {
+            var iterationsPerFrame = 10;
+            board = mapGenerator.iterateBoard(board, iterationsPerFrame);
+            iterations += iterationsPerFrame;
+            boardRenderer.render(board, iterations);
+        }, 1);
     };
     return Application;
 })();

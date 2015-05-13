@@ -361,22 +361,22 @@ class MapGenerator {
    }
    
    public iterateBoard(board: Board, iterations: number = 10): Board {
-      var initialInteriorTiles = board.getTiles();
+      var initialTiles = board.getTiles();
       var edgeTiles = this.getBoardEdgeTiles(board);
-      var initialScore = this.scoreBoard(board, initialInteriorTiles);
+      var initialScore = this.scoreBoard(board, initialTiles);
       var bestScore = initialScore;
       for (var i = 0; i < iterations; i++) {
          var clone = board.clone();
-         var cloneInteriorTiles = clone.getTiles();
+         var cloneTiles = clone.getTiles();
+         var cloneInteriorTiles = clone.getInteriorTiles();
          this.iterateBoardDispatcher(clone, cloneInteriorTiles);
-         var cloneScore = this.scoreBoard(clone, cloneInteriorTiles);
+         var cloneScore = this.scoreBoard(clone, cloneTiles);
 
          if (cloneScore < bestScore) {
             board = clone;
             bestScore = cloneScore;
          }
       }
-
 
       console.log("Iterated from " + initialScore + " to " + bestScore);
       return board;
