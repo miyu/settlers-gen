@@ -1,8 +1,10 @@
 ﻿var kTileSide: number = 50;
+var g = this;
 
 enum TileType {
    Water,
    Desert,
+   Gold,
    Wood,
    Clay,
    Sheep,
@@ -14,11 +16,12 @@ enum TileType {
 var kTileColors = [];
 kTileColors[TileType.Water]  = "#00B7FF";
 kTileColors[TileType.Desert] = "#FFF09E";
+kTileColors[TileType.Gold]   = "#FFE100";
 kTileColors[TileType.Wood]   = "#39AD43";
 kTileColors[TileType.Clay]   = "#FF9100";
 kTileColors[TileType.Sheep]  = "#BBFF00";
 kTileColors[TileType.Ore]    = "#D1D1D1";
-kTileColors[TileType.Wheat] = "#FFFF00";
+kTileColors[TileType.Wheat]  = "#FFFF00";
 
 var allTileTypes = [TileType.Water, TileType.Desert, TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
 var interiorTileTypes = [TileType.Desert, TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
@@ -103,12 +106,45 @@ class Board {
       this.forEachInterior(tile => result.push(tile));
       return result;
    }
+
+   public getTile(x: number, y: number, z?: number): Hex {
+      if (typeof(z) !== "undefined") {
+         if (x + y + z !== 0) {
+            throw new Error("Invalid tile coordinate!");
+         }
+      }
+
+      var yLine = this.hexesXy.get(x);
+      if (yLine === null) {
+         return null;
+      } else {
+         return yLine.get(y);
+      }
+   }
+
+   public getNeighbors(tile: Hex): Array<Hex> {
+      var neighbors = new Array<Hex>();
+      var candidates = [];
+      var position = tile.getPosition();
+      candidates.push(this.getTile(position.x + 1, position.y - 1, position.z));
+      candidates.push(this.getTile(position.x + 1, position.y, position.z - 1));
+      candidates.push(this.getTile(position.x - 1, position.y + 1, position.z));
+      candidates.push(this.getTile(position.x - 1, position.y, position.z + 1));
+      candidates.push(this.getTile(position.x, position.y + 1, position.z - 1));
+      candidates.push(this.getTile(position.x, position.y - 1, position.z + 1));
+      candidates.forEach(candidate => {
+         if (candidate) {
+            neighbors.push(candidate);
+         }
+      });
+      return neighbors;
+   }
 }
 
 class BoardGenerator {
    public generateCircularBoard(n: number = 3): Board {
       var hexesXy = new BoardDimension<BoardDimension<Hex>>(-n, n);
-      for (var x = -n; x <= n; x++) {Math.max(-n, -x-n)
+      for (var x = -n; x <= n; x++) {
          var minY = Math.max(-n, -x - n);
          var maxY = Math.min(n, -x + n);
          var hexesY = new BoardDimension<Hex>(minY, maxY);
@@ -139,7 +175,11 @@ class BoardDimension<T> {
    }
 
    public get(index: number) {
-      return this.arr[index - this.minIndex];
+      if (this.minIndex <= index && index <= this.maxIndex) {
+         return this.arr[index - this.minIndex];
+      } else {
+         return null;
+      }
    }
 
    public getLowerIndex(): number { return this.minIndex; }
@@ -147,16 +187,11 @@ class BoardDimension<T> {
 }
 
 class Hex {
-   private neighbors: Array<Hex> = [];
    private type: TileType = TileType.Undefined;
    private number: number = 0;
 
    constructor(private position: GridLocation, private boundary: Boolean) { }
 
-   public addNeighbor(tile: Hex) {
-      this.neighbors.push(tile);
-   }
-   
    public isBoundary(): Boolean { return this.boundary; }
    public getPosition(): GridLocation { return this.position; }
    public getType(): TileType { return this.type; }
@@ -172,13 +207,6 @@ class Hex {
    }
 }
 
-class HexHelper {
-   public linkHexes(a: Hex, b: Hex): void {
-      a.addNeighbor(b);
-      b.addNeighbor(a);
-   }
-}
-
 class BoardRenderer {
    constructor(private canvas: any, private context: any) {
       
@@ -190,7 +218,7 @@ class BoardRenderer {
             var position = hex.getPosition();
             var screenCoordinates = position.toScreenCoordinates();
             this.context.fillStyle = kTileColors[hex.getType()] || "#FF00FF";
-            this.context.setTransform(1, 0, 0, 1, 400, 400);
+            this.context.setTransform(1, 0, 0, 1, 500, 400);
 
             this.context.strokeStyle = "#000000";
             this.context.beginPath();
@@ -220,7 +248,7 @@ class BoardRenderer {
             var colorHex = (~~(255 * weight / 5)).toString(16);
             if (colorHex.length === 1) colorHex = "0" + colorHex;
             this.context.fillStyle = "#" + colorHex + colorHex + colorHex;
-            this.context.setTransform(0.5, 0, 0, 0.5, 1000, 200);
+            this.context.setTransform(0.5, 0, 0, 0.5, 1150, 200);
             this.context.strokeStyle = "#000000";
             this.context.beginPath();
             this.context.moveTo(screenCoordinates.x, screenCoordinates.y);
@@ -240,22 +268,45 @@ class BoardRenderer {
 }
 
 class MapGenerator {
-   public randomizeBoard(board: Board): void {
-      var tileCount = 0;
-      board.forEach(tile => tileCount++);
+   public randomizeBoard(board: Board, interiorWaterFraction: number = 0.0): void {
+      var interiorTileCount = 0;
+      board.forEachInterior(tile => interiorTileCount++);
       board.forEach(tile => { if (tile.isBoundary()) tile.setType(TileType.Water); });
-
+      
       var numbers = [];
       var types = [];
-      for (var i = 0; i < tileCount * 1.5; i++) {
+      for (var i = 0; i < interiorTileCount * 1.5; i++) {
          var number = i % 10 + 2;
          if (number >= 7) number ++;
          numbers.push(number);
-         types.push(resourceTileTypes[i % resourceTileTypes.length]);
       }
+
+      var normalize = 0.5;
+      for (var i = 0; i < resourceTileTypes.length; i++) {
+         for (var j = 0; j < (interiorTileCount / resourceTileTypes.length) * normalize; j++) {
+            types.push(resourceTileTypes[i]);
+         }
+      }
+      while (types.length < interiorTileCount) {
+         types.push(resourceTileTypes[~~(Math.random() * resourceTileTypes.length)]);
+      }
+
       shuffle(numbers);
+      shuffle(types);
+      for (var i = 0; i < interiorWaterFraction * interiorTileCount; i++) {
+         types.shift();
+         types.push(TileType.Water);
+      }
+      types.shift();
+      types.shift();
+      types.shift();
+      types.shift();
+      types.shift();
       types.push(TileType.Desert);
       types.push(TileType.Desert);
+      types.push(TileType.Gold);
+      types.push(TileType.Gold);
+      types.push(TileType.Gold);
       shuffle(types);
       
       board.forEachInterior(
@@ -264,12 +315,30 @@ class MapGenerator {
             tile.setNumber(numbers[i]);
          });
    }
+
+   private getBoardEdgeTiles(board: Board) {
+      var edgeTiles = new Array<Hex>();
+      board.forEach(tile => {
+         var neighbors = board.getNeighbors(tile);
+         var hasWaterNeighbor = false;
+         neighbors.forEach(n => {
+            if (n.getType() === TileType.Water) {
+               hasWaterNeighbor = true;
+            }
+         });
+         if (hasWaterNeighbor && tile.getType() != TileType.Water) {
+            edgeTiles.push(tile);
+         }
+      });
+      return edgeTiles;
+   }
    
-   public iterateBoard(board: Board): Board {
+   public iterateBoard(board: Board, iterations: number = 10): Board {
       var initialInteriorTiles = board.getTiles();
+      var edgeTiles = this.getBoardEdgeTiles(board);
       var initialScore = this.scoreBoard(board, initialInteriorTiles);
       var bestScore = initialScore;
-      for (var i = 0; i < 10; i++) {
+      for (var i = 0; i < iterations; i++) {
          var clone = board.clone();
          var cloneInteriorTiles = clone.getTiles();
          this.iterateBoardDispatcher(clone, cloneInteriorTiles);
@@ -280,6 +349,8 @@ class MapGenerator {
             bestScore = cloneScore;
          }
       }
+
+
       console.log("Iterated from " + initialScore + " to " + bestScore);
       return board;
    }
@@ -356,7 +427,9 @@ class MapGenerator {
       var multiplier = 1;
       if (aType === bType) {
          var stackBase = 2; //0.5;
-         if (aType === TileType.Wood) {
+         if (aType === TileType.Gold) {
+            multiplier = 100.0 + stackBase;
+         } else if (aType === TileType.Wood) {
             multiplier = 0.8 + stackBase;
          } else if (aType === TileType.Sheep) {
             multiplier = 0.8 + stackBase;
@@ -373,10 +446,14 @@ class MapGenerator {
          multiplier = 2.0;
       }
       if (aType === TileType.Desert) {
-         return 0;
+         multiplier = 0.0;
       }
       if (aType === TileType.Water) {
-         multiplier = 8.0;
+         multiplier = 3;
+//         multiplier = 8.0;
+      }
+      if (aType === TileType.Gold) {
+         multiplier = 6;
       }
       return 1 + multiplier * weight;
    }
@@ -391,17 +468,19 @@ class Application {
       this.context = this.canvas.getContext("2d");
 
       var boardGenerator = new BoardGenerator();
-      var board = boardGenerator.generateCircularBoard(4);
+      var board = boardGenerator.generateCircularBoard(5);
       var mapGenerator = new MapGenerator();
-      mapGenerator.randomizeBoard(board);
+      mapGenerator.randomizeBoard(board, 0.5);
       var boardRenderer = new BoardRenderer(this.canvas, this.context);
+      board = mapGenerator.iterateBoard(board, 5000);
       boardRenderer.render(board);
 
-      setInterval(
-         function() {
-            board = mapGenerator.iterateBoard(board);
-            boardRenderer.render(board);
-         }, 10);
+      g.board = board;
+//      setInterval(
+//         function() {
+//            board = mapGenerator.iterateBoard(board, 10);
+//            boardRenderer.render(board);
+//         }, 10);
    }
 }
 

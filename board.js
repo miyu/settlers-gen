@@ -1,26 +1,29 @@
 var kTileSide = 50;
+var g = this;
 var TileType;
 (function (TileType) {
     TileType[TileType["Water"] = 0] = "Water";
     TileType[TileType["Desert"] = 1] = "Desert";
-    TileType[TileType["Wood"] = 2] = "Wood";
-    TileType[TileType["Clay"] = 3] = "Clay";
-    TileType[TileType["Sheep"] = 4] = "Sheep";
-    TileType[TileType["Ore"] = 5] = "Ore";
-    TileType[TileType["Wheat"] = 6] = "Wheat";
-    TileType[TileType["Undefined"] = 7] = "Undefined";
+    TileType[TileType["Gold"] = 2] = "Gold";
+    TileType[TileType["Wood"] = 3] = "Wood";
+    TileType[TileType["Clay"] = 4] = "Clay";
+    TileType[TileType["Sheep"] = 5] = "Sheep";
+    TileType[TileType["Ore"] = 6] = "Ore";
+    TileType[TileType["Wheat"] = 7] = "Wheat";
+    TileType[TileType["Undefined"] = 8] = "Undefined";
 })(TileType || (TileType = {}));
 var kTileColors = [];
 kTileColors[0 /* Water */] = "#00B7FF";
 kTileColors[1 /* Desert */] = "#FFF09E";
-kTileColors[2 /* Wood */] = "#39AD43";
-kTileColors[3 /* Clay */] = "#FF9100";
-kTileColors[4 /* Sheep */] = "#BBFF00";
-kTileColors[5 /* Ore */] = "#D1D1D1";
-kTileColors[6 /* Wheat */] = "#FFFF00";
-var allTileTypes = [0 /* Water */, 1 /* Desert */, 2 /* Wood */, 3 /* Clay */, 4 /* Sheep */, 5 /* Ore */, 6 /* Wheat */];
-var interiorTileTypes = [1 /* Desert */, 2 /* Wood */, 3 /* Clay */, 4 /* Sheep */, 5 /* Ore */, 6 /* Wheat */];
-var resourceTileTypes = [2 /* Wood */, 3 /* Clay */, 4 /* Sheep */, 5 /* Ore */, 6 /* Wheat */];
+kTileColors[2 /* Gold */] = "#FFE100";
+kTileColors[3 /* Wood */] = "#39AD43";
+kTileColors[4 /* Clay */] = "#FF9100";
+kTileColors[5 /* Sheep */] = "#BBFF00";
+kTileColors[6 /* Ore */] = "#D1D1D1";
+kTileColors[7 /* Wheat */] = "#FFFF00";
+var allTileTypes = [0 /* Water */, 1 /* Desert */, 3 /* Wood */, 4 /* Clay */, 5 /* Sheep */, 6 /* Ore */, 7 /* Wheat */];
+var interiorTileTypes = [1 /* Desert */, 3 /* Wood */, 4 /* Clay */, 5 /* Sheep */, 6 /* Ore */, 7 /* Wheat */];
+var resourceTileTypes = [3 /* Wood */, 4 /* Clay */, 5 /* Sheep */, 6 /* Ore */, 7 /* Wheat */];
 var GridLocation = (function () {
     function GridLocation(x, y, z) {
         if (x === void 0) { x = 0; }
@@ -101,6 +104,37 @@ var Board = (function () {
         this.forEachInterior(function (tile) { return result.push(tile); });
         return result;
     };
+    Board.prototype.getTile = function (x, y, z) {
+        if (typeof (z) !== "undefined") {
+            if (x + y + z !== 0) {
+                throw new Error("Invalid tile coordinate!");
+            }
+        }
+        var yLine = this.hexesXy.get(x);
+        if (yLine === null) {
+            return null;
+        }
+        else {
+            return yLine.get(y);
+        }
+    };
+    Board.prototype.getNeighbors = function (tile) {
+        var neighbors = new Array();
+        var candidates = [];
+        var position = tile.getPosition();
+        candidates.push(this.getTile(position.x + 1, position.y - 1, position.z));
+        candidates.push(this.getTile(position.x + 1, position.y, position.z - 1));
+        candidates.push(this.getTile(position.x - 1, position.y + 1, position.z));
+        candidates.push(this.getTile(position.x - 1, position.y, position.z + 1));
+        candidates.push(this.getTile(position.x, position.y + 1, position.z - 1));
+        candidates.push(this.getTile(position.x, position.y - 1, position.z + 1));
+        candidates.forEach(function (candidate) {
+            if (candidate) {
+                neighbors.push(candidate);
+            }
+        });
+        return neighbors;
+    };
     return Board;
 })();
 var BoardGenerator = (function () {
@@ -110,7 +144,6 @@ var BoardGenerator = (function () {
         if (n === void 0) { n = 3; }
         var hexesXy = new BoardDimension(-n, n);
         for (var x = -n; x <= n; x++) {
-            Math.max(-n, -x - n);
             var minY = Math.max(-n, -x - n);
             var maxY = Math.min(n, -x + n);
             var hexesY = new BoardDimension(minY, maxY);
@@ -136,7 +169,12 @@ var BoardDimension = (function () {
         this.arr[index - this.minIndex] = value;
     };
     BoardDimension.prototype.get = function (index) {
-        return this.arr[index - this.minIndex];
+        if (this.minIndex <= index && index <= this.maxIndex) {
+            return this.arr[index - this.minIndex];
+        }
+        else {
+            return null;
+        }
     };
     BoardDimension.prototype.getLowerIndex = function () {
         return this.minIndex;
@@ -150,13 +188,9 @@ var Hex = (function () {
     function Hex(position, boundary) {
         this.position = position;
         this.boundary = boundary;
-        this.neighbors = [];
-        this.type = 7 /* Undefined */;
+        this.type = 8 /* Undefined */;
         this.number = 0;
     }
-    Hex.prototype.addNeighbor = function (tile) {
-        this.neighbors.push(tile);
-    };
     Hex.prototype.isBoundary = function () {
         return this.boundary;
     };
@@ -183,15 +217,6 @@ var Hex = (function () {
     };
     return Hex;
 })();
-var HexHelper = (function () {
-    function HexHelper() {
-    }
-    HexHelper.prototype.linkHexes = function (a, b) {
-        a.addNeighbor(b);
-        b.addNeighbor(a);
-    };
-    return HexHelper;
-})();
 var BoardRenderer = (function () {
     function BoardRenderer(canvas, context) {
         this.canvas = canvas;
@@ -203,7 +228,7 @@ var BoardRenderer = (function () {
             var position = hex.getPosition();
             var screenCoordinates = position.toScreenCoordinates();
             _this.context.fillStyle = kTileColors[hex.getType()] || "#FF00FF";
-            _this.context.setTransform(1, 0, 0, 1, 400, 400);
+            _this.context.setTransform(1, 0, 0, 1, 500, 400);
             _this.context.strokeStyle = "#000000";
             _this.context.beginPath();
             _this.context.moveTo(screenCoordinates.x, screenCoordinates.y);
@@ -231,7 +256,7 @@ var BoardRenderer = (function () {
             if (colorHex.length === 1)
                 colorHex = "0" + colorHex;
             _this.context.fillStyle = "#" + colorHex + colorHex + colorHex;
-            _this.context.setTransform(0.5, 0, 0, 0.5, 1000, 200);
+            _this.context.setTransform(0.5, 0, 0, 0.5, 1150, 200);
             _this.context.strokeStyle = "#000000";
             _this.context.beginPath();
             _this.context.moveTo(screenCoordinates.x, screenCoordinates.y);
@@ -251,36 +276,76 @@ var BoardRenderer = (function () {
 var MapGenerator = (function () {
     function MapGenerator() {
     }
-    MapGenerator.prototype.randomizeBoard = function (board) {
-        var tileCount = 0;
-        board.forEach(function (tile) { return tileCount++; });
+    MapGenerator.prototype.randomizeBoard = function (board, interiorWaterFraction) {
+        if (interiorWaterFraction === void 0) { interiorWaterFraction = 0.0; }
+        var interiorTileCount = 0;
+        board.forEachInterior(function (tile) { return interiorTileCount++; });
         board.forEach(function (tile) {
             if (tile.isBoundary())
                 tile.setType(0 /* Water */);
         });
         var numbers = [];
         var types = [];
-        for (var i = 0; i < tileCount * 1.5; i++) {
+        for (var i = 0; i < interiorTileCount * 1.5; i++) {
             var number = i % 10 + 2;
             if (number >= 7)
                 number++;
             numbers.push(number);
-            types.push(resourceTileTypes[i % resourceTileTypes.length]);
+        }
+        var normalize = 0.5;
+        for (var i = 0; i < resourceTileTypes.length; i++) {
+            for (var j = 0; j < (interiorTileCount / resourceTileTypes.length) * normalize; j++) {
+                types.push(resourceTileTypes[i]);
+            }
+        }
+        while (types.length < interiorTileCount) {
+            types.push(resourceTileTypes[~~(Math.random() * resourceTileTypes.length)]);
         }
         shuffle(numbers);
+        shuffle(types);
+        for (var i = 0; i < interiorWaterFraction * interiorTileCount; i++) {
+            types.shift();
+            types.push(0 /* Water */);
+        }
+        types.shift();
+        types.shift();
+        types.shift();
+        types.shift();
+        types.shift();
         types.push(1 /* Desert */);
         types.push(1 /* Desert */);
+        types.push(2 /* Gold */);
+        types.push(2 /* Gold */);
+        types.push(2 /* Gold */);
         shuffle(types);
         board.forEachInterior(function (tile, i) {
             tile.setType(types[i]);
             tile.setNumber(numbers[i]);
         });
     };
-    MapGenerator.prototype.iterateBoard = function (board) {
+    MapGenerator.prototype.getBoardEdgeTiles = function (board) {
+        var edgeTiles = new Array();
+        board.forEach(function (tile) {
+            var neighbors = board.getNeighbors(tile);
+            var hasWaterNeighbor = false;
+            neighbors.forEach(function (n) {
+                if (n.getType() === 0 /* Water */) {
+                    hasWaterNeighbor = true;
+                }
+            });
+            if (hasWaterNeighbor && tile.getType() != 0 /* Water */) {
+                edgeTiles.push(tile);
+            }
+        });
+        return edgeTiles;
+    };
+    MapGenerator.prototype.iterateBoard = function (board, iterations) {
+        if (iterations === void 0) { iterations = 10; }
         var initialInteriorTiles = board.getTiles();
+        var edgeTiles = this.getBoardEdgeTiles(board);
         var initialScore = this.scoreBoard(board, initialInteriorTiles);
         var bestScore = initialScore;
-        for (var i = 0; i < 10; i++) {
+        for (var i = 0; i < iterations; i++) {
             var clone = board.clone();
             var cloneInteriorTiles = clone.getTiles();
             this.iterateBoardDispatcher(clone, cloneInteriorTiles);
@@ -357,33 +422,39 @@ var MapGenerator = (function () {
         var multiplier = 1;
         if (aType === bType) {
             var stackBase = 2; //0.5;
-            if (aType === 2 /* Wood */) {
+            if (aType === 2 /* Gold */) {
+                multiplier = 100.0 + stackBase;
+            }
+            else if (aType === 3 /* Wood */) {
                 multiplier = 0.8 + stackBase;
             }
-            else if (aType === 4 /* Sheep */) {
+            else if (aType === 5 /* Sheep */) {
                 multiplier = 0.8 + stackBase;
             }
-            else if (aType === 6 /* Wheat */) {
+            else if (aType === 7 /* Wheat */) {
                 multiplier = 1.2 + stackBase;
             }
-            else if (aType === 5 /* Ore */) {
+            else if (aType === 6 /* Ore */) {
                 multiplier = 1.2 + stackBase;
             }
-            else if (aType === 3 /* Clay */) {
+            else if (aType === 4 /* Clay */) {
                 multiplier = 1.2 + stackBase;
             }
         }
-        else if (aType === 2 /* Wood */ && bType === 3 /* Clay */) {
+        else if (aType === 3 /* Wood */ && bType === 4 /* Clay */) {
             multiplier = 2.0;
         }
-        else if (aType === 5 /* Ore */ && bType === 6 /* Wheat */) {
+        else if (aType === 6 /* Ore */ && bType === 7 /* Wheat */) {
             multiplier = 2.0;
         }
         if (aType === 1 /* Desert */) {
-            return 0;
+            multiplier = 0.0;
         }
         if (aType === 0 /* Water */) {
-            multiplier = 8.0;
+            multiplier = 3;
+        }
+        if (aType === 2 /* Gold */) {
+            multiplier = 6;
         }
         return 1 + multiplier * weight;
     };
@@ -396,15 +467,18 @@ var Application = (function () {
     Application.prototype.run = function () {
         this.context = this.canvas.getContext("2d");
         var boardGenerator = new BoardGenerator();
-        var board = boardGenerator.generateCircularBoard(4);
+        var board = boardGenerator.generateCircularBoard(5);
         var mapGenerator = new MapGenerator();
-        mapGenerator.randomizeBoard(board);
+        mapGenerator.randomizeBoard(board, 0.5);
         var boardRenderer = new BoardRenderer(this.canvas, this.context);
+        board = mapGenerator.iterateBoard(board, 5000);
         boardRenderer.render(board);
-        setInterval(function () {
-            board = mapGenerator.iterateBoard(board);
-            boardRenderer.render(board);
-        }, 10);
+        g.board = board;
+        //      setInterval(
+        //         function() {
+        //            board = mapGenerator.iterateBoard(board, 10);
+        //            boardRenderer.render(board);
+        //         }, 10);
     };
     return Application;
 })();
