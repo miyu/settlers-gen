@@ -572,8 +572,14 @@ var MapGenerator = /** @class */ (function () {
             }
         });
         var allShorelines = board.getShorelines();
-        shuffle(allShorelines);
-        var shorelines = allShorelines.splice(0, portTileTypesBag.length + 3);
+        var numPorts = portTileTypesBag.length + 3;
+        var shorelines = [];
+        for (var i = 0; i < numPorts; i++) {
+            var s = allShorelines[~~(i * allShorelines.length / numPorts)];
+            shorelines.push(s);
+        }
+        // shuffle(allShorelines);
+        // const shorelines = allShorelines.splice(0, portTileTypesBag.length + 3);
         var ports = {};
         for (var i = 0; i < shorelines.length; i++) {
             ports[shorelines[i].buildKey()] = portTileTypesBag[i % portTileTypesBag.length];
