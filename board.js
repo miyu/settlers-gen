@@ -42,15 +42,19 @@ kTileColors[TileType.Clay] = "#FF9100";
 kTileColors[TileType.Sheep] = "#BBFF00";
 kTileColors[TileType.Ore] = "#D1D1D1";
 kTileColors[TileType.Wheat] = "#FFFF00";
+kTileColors[TileType.Undefined] = "#FFFF00";
+kTileColors[TileType.Wildcard] = "#FF00FF";
 var kTileLetters = [];
-kTileLetters[TileType.Water] = "w";
-kTileLetters[TileType.Desert] = "d";
-kTileLetters[TileType.Gold] = "G";
-kTileLetters[TileType.Wood] = "W";
-kTileLetters[TileType.Clay] = "C";
-kTileLetters[TileType.Sheep] = "S";
-kTileLetters[TileType.Ore] = "O";
-kTileLetters[TileType.Wheat] = "H";
+kTileLetters[TileType.Water] = "Wa";
+kTileLetters[TileType.Desert] = "Des";
+kTileLetters[TileType.Gold] = "Go";
+kTileLetters[TileType.Wood] = "Wo";
+kTileLetters[TileType.Clay] = "Cl";
+kTileLetters[TileType.Sheep] = "Sh";
+kTileLetters[TileType.Ore] = "Or";
+kTileLetters[TileType.Wheat] = "Wh";
+kTileLetters[TileType.Undefined] = "???";
+kTileLetters[TileType.Wildcard] = "*";
 var kWeightsByNumber = [0, 0, 1, 2, 3, 4, 5, 0, 5, 4, 3, 2, 1, 0];
 var kDesiredNumberDistribution = [
     2,
@@ -67,7 +71,7 @@ var kDesiredNumberDistribution = [
 var allTileTypes = [TileType.Water, TileType.Desert, TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
 var interiorTileTypes = [TileType.Desert, TileType.Gold, TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
 var resourceTileTypes = [TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
-var portTileTypes = __spreadArray(__spreadArray([], resourceTileTypes, true), [TileType.Wildcard], false);
+var portTileTypesBag = __spreadArray(__spreadArray([], resourceTileTypes, true), [TileType.Wildcard, TileType.Wildcard, TileType.Wildcard], false);
 var GridLocation = /** @class */ (function () {
     function GridLocation(x, y, z) {
         if (x === void 0) { x = 0; }
@@ -125,6 +129,7 @@ var kNeighborOffsets = [
     new GridDirection(0, 1, -1),
     new GridDirection(0, -1, 1)
 ];
+;
 var Board = /** @class */ (function () {
     function Board(hexesXy, ports) {
         this.hexesXy = hexesXy;
@@ -262,7 +267,7 @@ var BoardGenerator = /** @class */ (function () {
             }
             hexesXy.put(x, hexesY);
         }
-        return new Board(hexesXy, []);
+        return new Board(hexesXy, {});
     };
     return BoardGenerator;
 }());
@@ -417,6 +422,7 @@ var BoardRenderer = /** @class */ (function () {
         scrollingGraph.render(this.context, 0, 0, 200, 100);
         board.forEach(function (hex) {
             _this.context.setTransform(1, 0, 0, 1, 500, 400);
+            _this.context.lineWidth = 1;
             _this.context.strokeStyle = "#000000";
             _this.context.fillStyle = kTileColors[hex.getType()] || "#FF00FF";
             _this.hexPath(hex);
@@ -437,6 +443,7 @@ var BoardRenderer = /** @class */ (function () {
             if (colorHex.length === 1)
                 colorHex = "0" + colorHex;
             _this.context.setTransform(0.5, 0, 0, 0.5, 1150, 200);
+            _this.context.lineWidth = 1;
             _this.context.strokeStyle = "#000000";
             _this.context.fillStyle = "#" + colorHex + colorHex + colorHex;
             _this.hexPath(hex);
@@ -445,6 +452,10 @@ var BoardRenderer = /** @class */ (function () {
         }, this);
         var shorelines = board.getShorelines();
         shorelines.forEach(function (shoreline) {
+            var key = shoreline.buildKey();
+            var portType = board.ports[key];
+            if (!portType)
+                return;
             var hex = shoreline.hex;
             var hexPosition = hex.getPosition();
             var direction = shoreline.direction;
@@ -452,13 +463,22 @@ var BoardRenderer = /** @class */ (function () {
             var positionA = hexPosition.toScreenCoordinates();
             var positionB = neighbor.getPosition().toScreenCoordinates();
             _this.context.setTransform(1, 0, 0, 1, 500, 400);
-            _this.context.strokeStyle = "#000000";
+            _this.context.lineWidth = 3;
+            console.log(key + ": " + portType + " " + kTileColors[portType]);
+            _this.context.strokeStyle = kTileColors[portType]; // "#000000";
             _this.context.beginPath();
-            _this.context.moveTo(positionA.x, positionA.y + kTileSide);
-            _this.context.lineTo(positionB.x, positionB.y + kTileSide);
+            _this.context.moveTo(positionA.x * 0.8 + positionB.x * 0.2, positionA.y * 0.8 + positionB.y * 0.2 + kTileSide);
+            _this.context.lineTo(positionA.x * 0.2 + positionB.x * 0.8, positionA.y * 0.2 + positionB.y * 0.8 + kTileSide);
             _this.context.closePath();
             _this.context.stroke();
+            var fontSize = 20;
+            _this.context.font = fontSize + "px 'segoe ui'";
+            _this.context.fillStyle = "#000000";
+            _this.context.textAlign = 'center';
+            _this.context.fillText(portType + " " + kTileLetters[portType], (positionA.x + positionB.x) / 2, (positionA.y + positionB.y) / 2 + kTileSide + fontSize / 2);
+            _this.context.stroke();
         });
+        console.log("---");
     };
     BoardRenderer.prototype.hexPath = function (hex) {
         var position = hex.getPosition();
@@ -551,23 +571,29 @@ var MapGenerator = /** @class */ (function () {
                 tile.setNumber(numbers[numberIndex++]);
             }
         });
-        var shorelines = board.getShorelines();
-        console.log("SHORELINES", shorelines);
-        return board;
+        var allShorelines = board.getShorelines();
+        shuffle(allShorelines);
+        var shorelines = allShorelines.splice(0, portTileTypesBag.length + 10);
+        var ports = {};
+        for (var i = 0; i < shorelines.length; i++) {
+            ports[shorelines[i].buildKey()] = portTileTypesBag[i % portTileTypesBag.length];
+        }
+        console.log("INIT PORTS", ports);
+        board.ports = ports;
     };
     MapGenerator.prototype.iterateBoard = function (board, iterations) {
         if (iterations === void 0) { iterations = 10; }
         var initialTiles = board.getTiles();
         var edgeTiles = board.getEdgeTiles();
         var shorelines = board.getShorelines();
-        var initialScore = this.scoreBoard(board, initialTiles);
+        var initialScore = this.scoreBoard(board, initialTiles, shorelines);
         var bestScore = initialScore;
         for (var i = 0; i < iterations; i++) {
             var clone = board.clone();
             var cloneTiles = clone.getTiles();
             var cloneInteriorTiles = clone.getInteriorTiles();
             this.iterateBoardDispatcher(clone, cloneInteriorTiles);
-            var cloneScore = this.scoreBoard(clone, cloneTiles);
+            var cloneScore = this.scoreBoard(clone, cloneTiles, shorelines);
             if (cloneScore < bestScore) {
                 board = clone;
                 bestScore = cloneScore;
@@ -609,7 +635,7 @@ var MapGenerator = /** @class */ (function () {
         first.setType(second.getType());
         second.setType(temp);
     };
-    MapGenerator.prototype.scoreBoard = function (board, interiorTiles) {
+    MapGenerator.prototype.scoreBoard = function (board, interiorTiles, shorelines) {
         var _this = this;
         var kWeightsByNumber = [-1, -1, 1, 2, 3, 4, 5, -1, 5, 4, 3, 2, 1, -1];
         var score = 0;
@@ -617,13 +643,43 @@ var MapGenerator = /** @class */ (function () {
             var hexPower = 0;
             interiorTiles.forEach(function (tileB) {
                 if (tileA !== tileB) {
-                    var weight = kWeightsByNumber[tileA.getNumber()] + kWeightsByNumber[tileB.getNumber()];
+                    var weighting = {
+                        2: 1,
+                        3: 2,
+                        4: 4,
+                        5: 6,
+                        6: 9,
+                        7: 12,
+                        8: 16,
+                        9: 20,
+                        10: 25
+                    };
+                    var w1 = kWeightsByNumber[tileA.getNumber()];
+                    var w2 = kWeightsByNumber[tileB.getNumber()];
+                    var weight = ((w1 * w2) + (w1 + w2)) / 2;
                     var multiplier = _this.rateHexPair(tileA, tileB);
                     hexPower += Math.pow(weight * multiplier, 2);
                 }
             }, _this);
             score += hexPower; //Math.pow(hexPower, 2);
         }, this);
+        shorelines.forEach(function (shoreline) {
+            var hex = shoreline.hex;
+            var key = shoreline.buildKey();
+            var portType = board.ports[key];
+            if (!portType)
+                return;
+            var multiplier = 2.0;
+            if (portType == hex.getType()) {
+                multiplier *= 1.5;
+            }
+            else if (portType == TileType.Wildcard) {
+                multiplier *= 1.2;
+            }
+            score += kWeightsByNumber[hex.getNumber()] * portType;
+            var neighbors = board.getNeighbors(hex);
+            neighbors.forEach(function (n) { });
+        });
         return score;
     };
     MapGenerator.prototype.rateHexPair = function (a, b) {
@@ -681,7 +737,7 @@ var MapGenerator = /** @class */ (function () {
             var distanceFrom7 = Math.abs(a.getNumber() - 7);
             // discourage 6/8 and 2/12 golds. Bias toward 3s.
             //            7   6    5    4    3    2
-            multiplier = [-1, 1.3, 1.2, 1.2, 1.1, 1.6][distanceFrom7];
+            multiplier = [-1, 4.5, 3.8, 2.3, 2.3, 4.6][distanceFrom7];
         }
         else if (aType === TileType.Sheep && (bType === TileType.Wheat || bType === TileType.Ore)) {
             multiplier = 1.2;
@@ -741,9 +797,9 @@ var Application = /** @class */ (function () {
     Application.prototype.run = function () {
         this.context = this.canvas.getContext("2d");
         var boardGenerator = new BoardGenerator();
-        var board = boardGenerator.generateCircularBoard(4);
+        var board = boardGenerator.generateCircularBoard(6);
         var mapGenerator = new MapGenerator();
-        mapGenerator.randomizeBoard(board, 0.15);
+        mapGenerator.randomizeBoard(board, 0.6);
         var boardRenderer = new BoardRenderer(this.canvas, this.context);
         var scrollingGraph = new SlidingGraph(200, 100);
         var iterations = 0;
