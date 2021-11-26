@@ -10,7 +10,8 @@ enum TileType {
    Sheep,
    Ore,
    Wheat,
-   Undefined
+   Undefined,
+   Wildcard,
 }
 
 var kTileColors = [];
@@ -34,10 +35,23 @@ kTileLetters[TileType.Ore] = "O";
 kTileLetters[TileType.Wheat] = "H";
 
 var kWeightsByNumber = [0, 0, 1, 2, 3, 4, 5, 0, 5, 4, 3, 2, 1, 0];
+var kDesiredNumberDistribution = [
+  2,
+  3, 3,
+  4, 4,
+  5, 5, 5,
+  6, 6,
+  8, 8,
+  9, 9, 9,
+  10, 10,
+  11, 11,
+  12
+];
 
 var allTileTypes = [TileType.Water, TileType.Desert, TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
 var interiorTileTypes = [TileType.Desert, TileType.Gold, TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
 var resourceTileTypes = [TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
+var portTileTypes = [...resourceTileTypes, TileType.Wildcard];
 
 class GridLocation {
    constructor(
@@ -56,6 +70,26 @@ class GridLocation {
    public distanceFrom(o: GridLocation): number {
       return (Math.abs(this.x - o.x) + Math.abs(this.y - o.y) + Math.abs(this.z - o.z)) / 2;
    }
+
+   public offsetBy(o: GridDirection) {
+     return new GridLocation(this.x + o.dx, this.y + o.dy, this.z + o.dz);
+   }
+
+   public toString(): string {
+     return `at${this.x}_${this.y}_${this.z}`;
+   }
+}
+
+class GridDirection {
+  constructor(
+    public dx: number = 0,
+    public dy: number = 0,
+    public dz: number = 0
+  ) { }
+
+  public toString(): string {
+    return `dir${this.dx}_${this.dy}_${this.dz}`;
+  }
 }
 
 class Vec2 {
@@ -65,8 +99,22 @@ class Vec2 {
    ) { }
 }
 
+
+var kNeighborOffsets = [
+  new GridDirection(1, -1, 0),
+  new GridDirection(1, 0, -1),
+  new GridDirection(-1, 1, 0),
+  new GridDirection(-1, 0, 1),
+  new GridDirection(0, 1, -1),
+  new GridDirection(0, -1, 1)
+];
+
+type PortDictionary = {[key: string]: TileType};
+
 class Board {
-   constructor(private hexesXy: BoardDimension<BoardDimension<Hex>>) { }
+   constructor(
+     private hexesXy: BoardDimension<BoardDimension<Hex>>,
+     private ports: []) { }
 
    public getHexesXy() { return this.hexesXy; }
 
@@ -104,7 +152,7 @@ class Board {
          }
          newHexesXy.put(x, newYLine);
       }
-      return new Board(newHexesXy);
+      return new Board(newHexesXy, {...this.ports});
    }
 
    public getTiles(): Array<Hex> {
@@ -117,6 +165,43 @@ class Board {
       var result = new Array<Hex>();
       this.forEachInterior(tile => result.push(tile));
       return result;
+   }
+
+   public getEdgeTiles() {
+     var edgeTiles = new Array<Hex>();
+       this.forEach(tile => {
+          var neighbors = this.getNeighbors(tile);
+          var hasWaterNeighbor = false;
+          neighbors.forEach(n => {
+             if (n.getType() === TileType.Water) {
+                hasWaterNeighbor = true;
+             }
+          });
+          if (hasWaterNeighbor && tile.getType() != TileType.Water) {
+            edgeTiles.push(tile);
+          }
+       });
+       return edgeTiles;
+    }
+
+    public getShorelines() : Shoreline[] {
+       var edgeTiles = this.getEdgeTiles();
+       var shorelines = [];
+       edgeTiles.forEach(tile => {
+         const p = tile.getPosition();
+         kNeighborOffsets.forEach(offset => {
+           const q = p.offsetBy(offset);
+           const n = this.getTileWithLocation(q);
+           if (n.getType() === TileType.Water) {
+             shorelines.push(new Shoreline(tile, offset));
+           }
+         })
+       });
+       return shorelines;
+    }
+
+   public getTileWithLocation(p: GridLocation) : Hex {
+     return this.getTile(p.x, p.y, p.z);
    }
 
    public getTile(x: number, y: number, z?: number): Hex {
@@ -168,7 +253,8 @@ class BoardGenerator {
          }
          hexesXy.put(x, hexesY);
       }
-      return new Board(hexesXy);
+
+      return new Board(hexesXy, []);
    }
 }
 
@@ -219,9 +305,20 @@ class Hex {
    }
 }
 
+class Shoreline {
+  constructor(
+    public hex: Hex,
+    public direction: GridDirection,
+  ) {}
+
+  buildKey() {
+    return this.hex.getPosition().toString() + "" + this.direction.toString();
+  }
+}
+
 class BoardRenderer {
    constructor(private canvas: any, private context: any) {
-      
+
    }
 
    public render(board: Board, iterations: number, scrollingGraph: SlidingGraph): void {
@@ -254,6 +351,8 @@ class BoardRenderer {
             typeGroup.push(tile);
          }
       )
+
+
       for (var i = 2; i <= 12; i++) {
          var fontSize = 20;
          this.context.fillStyle = "#000000";
@@ -279,7 +378,7 @@ class BoardRenderer {
             }
          }
       }
-      
+
       var maximumTypeCount = 1; // can't be 0 or div by 0
       for (var i = 0; i < interiorTileTypes.length; i++) {
          if (tilesByType[interiorTileTypes[i]]) {
@@ -325,25 +424,15 @@ class BoardRenderer {
 
       board.forEach(
          (hex) => {
-            var position = hex.getPosition();
-            var screenCoordinates = position.toScreenCoordinates();
-            this.context.fillStyle = kTileColors[hex.getType()] || "#FF00FF";
             this.context.setTransform(1, 0, 0, 1, 500, 400);
-
             this.context.strokeStyle = "#000000";
-            this.context.beginPath();
-            this.context.moveTo(screenCoordinates.x, screenCoordinates.y);
-            this.context.lineTo(screenCoordinates.x + kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2);
-            this.context.lineTo(screenCoordinates.x + kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2 + kTileSide);
-            this.context.lineTo(screenCoordinates.x, screenCoordinates.y + kTileSide * 2);
-            this.context.lineTo(screenCoordinates.x - kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2 + kTileSide);
-            this.context.lineTo(screenCoordinates.x - kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2);
-            this.context.lineTo(screenCoordinates.x, screenCoordinates.y);
-            this.context.closePath();
+            this.context.fillStyle = kTileColors[hex.getType()] || "#FF00FF";
+            this.hexPath(hex);
             this.context.fill();
             this.context.stroke();
 
             if (hex.getType() !== TileType.Water && hex.getType() !== TileType.Desert) {
+              const screenCoordinates = hex.getPosition().toScreenCoordinates();
                var fontSize = 20;
                this.context.fillStyle = "#000000";
                this.context.font = fontSize + "px 'segoe ui'";
@@ -356,24 +445,53 @@ class BoardRenderer {
             var weight = kWeightsByNumber[hex.getNumber()];
             var colorHex = (~~(255 * weight / 5)).toString(16);
             if (colorHex.length === 1) colorHex = "0" + colorHex;
-            this.context.fillStyle = "#" + colorHex + colorHex + colorHex;
             this.context.setTransform(0.5, 0, 0, 0.5, 1150, 200);
             this.context.strokeStyle = "#000000";
-            this.context.beginPath();
-            this.context.moveTo(screenCoordinates.x, screenCoordinates.y);
-            this.context.lineTo(screenCoordinates.x + kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2);
-            this.context.lineTo(screenCoordinates.x + kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2 + kTileSide);
-            this.context.lineTo(screenCoordinates.x, screenCoordinates.y + kTileSide * 2);
-            this.context.lineTo(screenCoordinates.x - kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2 + kTileSide);
-            this.context.lineTo(screenCoordinates.x - kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2);
-            this.context.lineTo(screenCoordinates.x, screenCoordinates.y);
-            this.context.closePath();
+            this.context.fillStyle = "#" + colorHex + colorHex + colorHex;
+            this.hexPath(hex);
             this.context.fill();
             this.context.stroke();
 
          }, this
       );
+
+      const shorelines = board.getShorelines();
+      shorelines.forEach(shoreline => {
+        const hex = shoreline.hex;
+        const hexPosition = hex.getPosition();
+        const direction = shoreline.direction;
+        const neighbor = board.getTileWithLocation(hexPosition.offsetBy(direction));
+        const positionA = hexPosition.toScreenCoordinates();
+        const positionB = neighbor.getPosition().toScreenCoordinates();
+
+        this.context.setTransform(1, 0, 0, 1, 500, 400);
+        this.context.strokeStyle = "#000000";
+        this.context.beginPath();
+        this.context.moveTo(positionA.x, positionA.y + kTileSide);
+        this.context.lineTo(positionB.x, positionB.y + kTileSide);
+        this.context.closePath();
+        this.context.stroke();
+      })
    }
+
+   hexPath(hex: Hex) {
+     var position = hex.getPosition();
+     var screenCoordinates = position.toScreenCoordinates();
+
+     this.context.beginPath();
+     this.context.moveTo(screenCoordinates.x, screenCoordinates.y);
+     this.context.lineTo(screenCoordinates.x + kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2);
+     this.context.lineTo(screenCoordinates.x + kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2 + kTileSide);
+     this.context.lineTo(screenCoordinates.x, screenCoordinates.y + kTileSide * 2);
+     this.context.lineTo(screenCoordinates.x - kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2 + kTileSide);
+     this.context.lineTo(screenCoordinates.x - kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2);
+     this.context.lineTo(screenCoordinates.x, screenCoordinates.y);
+     this.context.closePath();
+   }
+}
+
+class IterationDebugInfo {
+
 }
 
 class IterationResult {
@@ -395,9 +513,11 @@ class MapGenerator {
 
       var numberNormalize = 0.8;
       var numbers = [];
+      shuffle(kDesiredNumberDistribution);
       for (var i = 0; i < ~~(resourceTileCount * numberNormalize); i++) {
-         var number = i % 10 + 2;
-         if (number >= 7) number++;
+         // var number = i % 10 + 2;
+         // if (number >= 7) number++;
+         var number = kDesiredNumberDistribution[i % kDesiredNumberDistribution.length];
          numbers.push(number);
       }
 
@@ -433,7 +553,7 @@ class MapGenerator {
          types.push(TileType.Water);
       }
       shuffle(types);
-      
+
       if (types.length != interiorTileCount) {
          throw new Error("Check distribution code: " + types.length + " " + interiorTileCount);
       }
@@ -448,28 +568,17 @@ class MapGenerator {
                tile.setNumber(numbers[numberIndex++]);
             }
          });
+
+
+      const shorelines = board.getShorelines();
+      console.log("SHORELINES", shorelines);
+      return board;
    }
 
-   private getBoardEdgeTiles(board: Board) {
-      var edgeTiles = new Array<Hex>();
-      board.forEach(tile => {
-         var neighbors = board.getNeighbors(tile);
-         var hasWaterNeighbor = false;
-         neighbors.forEach(n => {
-            if (n.getType() === TileType.Water) {
-               hasWaterNeighbor = true;
-            }
-         });
-         if (hasWaterNeighbor && tile.getType() != TileType.Water) {
-            edgeTiles.push(tile);
-         }
-      });
-      return edgeTiles;
-   }
-   
    public iterateBoard(board: Board, iterations: number = 10): IterationResult {
       var initialTiles = board.getTiles();
-      var edgeTiles = this.getBoardEdgeTiles(board);
+      var edgeTiles = board.getEdgeTiles();
+      var shorelines = board.getShorelines();
       var initialScore = this.scoreBoard(board, initialTiles);
       var bestScore = initialScore;
       for (var i = 0; i < iterations; i++) {
@@ -501,7 +610,7 @@ class MapGenerator {
       var first = interiorTiles[~~(Math.random() * interiorTiles.length)];
       var second = interiorTiles[~~(Math.random() * interiorTiles.length)];
 
-      if (first.getType() === TileType.Water || second.getType() === TileType.Water || 
+      if (first.getType() === TileType.Water || second.getType() === TileType.Water ||
           first.getType() === TileType.Desert || second.getType() === TileType.Desert) {
          return;
       }
@@ -537,7 +646,7 @@ class MapGenerator {
          var hexPower = 0;
          interiorTiles.forEach(tileB => {
             if (tileA !== tileB) {
-               var weight = kWeightsByNumber[tileA.getNumber()] * kWeightsByNumber[tileB.getNumber()];
+               var weight = kWeightsByNumber[tileA.getNumber()] + kWeightsByNumber[tileB.getNumber()];
                var multiplier = this.rateHexPair(tileA, tileB);
                hexPower += Math.pow(weight * multiplier, 2);
             }
@@ -553,13 +662,13 @@ class MapGenerator {
       }
 
       var distance = a.getPosition().distanceFrom(b.getPosition());
-      if (distance > 3) {
+      if (distance >= 1.9) {
          return 0;
       }
       var weight = 1 / Math.pow(a.getPosition().distanceFrom(b.getPosition()), 2);
       var aType = a.getType();
       var bType = b.getType();
-      /* Desert, Wood, Clay, Sheep, Ore, Wheat 
+      /* Desert, Wood, Clay, Sheep, Ore, Wheat
          Road = Wood Clay
          Settlement = Clay Wood Wheat Sheep
          City = Wheat Wheat Ore Ore Ore
@@ -590,7 +699,10 @@ class MapGenerator {
          multiplier = 3;
 //         multiplier = 8.0;
       } else if (aType === TileType.Gold) {
-         multiplier = 1.2;
+         var distanceFrom7 = Math.abs(a.getNumber() - 7);
+         // discourage 6/8 and 2/12 golds. Bias toward 3s.
+         //            7   6    5    4    3    2
+         multiplier = [-1, 1.3, 1.2, 1.2, 1.1, 1.6][distanceFrom7];
       } else if (aType === TileType.Sheep && (bType === TileType.Wheat || bType === TileType.Ore)) {
          multiplier = 1.2;
       }
@@ -623,7 +735,7 @@ class SlidingGraph {
          this.context.drawImage(this.canvas, 0, this.height - rescaledHeight, this.width, rescaledHeight);
          this.scale = value;
       }
-      
+
       this.context.fillStyle = "#FFFFFF"
       this.context.fillRect(this.currentX, 0, 1, this.height);
       var renderedHeight = this.height * (value / this.scale);
@@ -655,9 +767,9 @@ class Application {
       this.context = this.canvas.getContext("2d");
 
       var boardGenerator = new BoardGenerator();
-      var board = boardGenerator.generateCircularBoard(5);
+      var board = boardGenerator.generateCircularBoard(4);
       var mapGenerator = new MapGenerator();
-      mapGenerator.randomizeBoard(board, 0.5);
+      mapGenerator.randomizeBoard(board, 0.15);
       var boardRenderer = new BoardRenderer(this.canvas, this.context);
       var scrollingGraph = new SlidingGraph(200, 100);
 

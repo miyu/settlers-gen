@@ -1,3 +1,23 @@
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
+var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+        if (ar || !(i in from)) {
+            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+            ar[i] = from[i];
+        }
+    }
+    return to.concat(ar || Array.prototype.slice.call(from));
+};
 var kTileSide = 50;
 var g = this;
 var TileType;
@@ -11,30 +31,44 @@ var TileType;
     TileType[TileType["Ore"] = 6] = "Ore";
     TileType[TileType["Wheat"] = 7] = "Wheat";
     TileType[TileType["Undefined"] = 8] = "Undefined";
+    TileType[TileType["Wildcard"] = 9] = "Wildcard";
 })(TileType || (TileType = {}));
 var kTileColors = [];
-kTileColors[0 /* Water */] = "#00B7FF";
-kTileColors[1 /* Desert */] = "#FFF09E";
-kTileColors[2 /* Gold */] = "#FFE100";
-kTileColors[3 /* Wood */] = "#39AD43";
-kTileColors[4 /* Clay */] = "#FF9100";
-kTileColors[5 /* Sheep */] = "#BBFF00";
-kTileColors[6 /* Ore */] = "#D1D1D1";
-kTileColors[7 /* Wheat */] = "#FFFF00";
+kTileColors[TileType.Water] = "#00B7FF";
+kTileColors[TileType.Desert] = "#FFF09E";
+kTileColors[TileType.Gold] = "#FFE100";
+kTileColors[TileType.Wood] = "#39AD43";
+kTileColors[TileType.Clay] = "#FF9100";
+kTileColors[TileType.Sheep] = "#BBFF00";
+kTileColors[TileType.Ore] = "#D1D1D1";
+kTileColors[TileType.Wheat] = "#FFFF00";
 var kTileLetters = [];
-kTileLetters[0 /* Water */] = "w";
-kTileLetters[1 /* Desert */] = "d";
-kTileLetters[2 /* Gold */] = "G";
-kTileLetters[3 /* Wood */] = "W";
-kTileLetters[4 /* Clay */] = "C";
-kTileLetters[5 /* Sheep */] = "S";
-kTileLetters[6 /* Ore */] = "O";
-kTileLetters[7 /* Wheat */] = "H";
+kTileLetters[TileType.Water] = "w";
+kTileLetters[TileType.Desert] = "d";
+kTileLetters[TileType.Gold] = "G";
+kTileLetters[TileType.Wood] = "W";
+kTileLetters[TileType.Clay] = "C";
+kTileLetters[TileType.Sheep] = "S";
+kTileLetters[TileType.Ore] = "O";
+kTileLetters[TileType.Wheat] = "H";
 var kWeightsByNumber = [0, 0, 1, 2, 3, 4, 5, 0, 5, 4, 3, 2, 1, 0];
-var allTileTypes = [0 /* Water */, 1 /* Desert */, 3 /* Wood */, 4 /* Clay */, 5 /* Sheep */, 6 /* Ore */, 7 /* Wheat */];
-var interiorTileTypes = [1 /* Desert */, 2 /* Gold */, 3 /* Wood */, 4 /* Clay */, 5 /* Sheep */, 6 /* Ore */, 7 /* Wheat */];
-var resourceTileTypes = [3 /* Wood */, 4 /* Clay */, 5 /* Sheep */, 6 /* Ore */, 7 /* Wheat */];
-var GridLocation = (function () {
+var kDesiredNumberDistribution = [
+    2,
+    3, 3,
+    4, 4,
+    5, 5, 5,
+    6, 6,
+    8, 8,
+    9, 9, 9,
+    10, 10,
+    11, 11,
+    12
+];
+var allTileTypes = [TileType.Water, TileType.Desert, TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
+var interiorTileTypes = [TileType.Desert, TileType.Gold, TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
+var resourceTileTypes = [TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
+var portTileTypes = __spreadArray(__spreadArray([], resourceTileTypes, true), [TileType.Wildcard], false);
+var GridLocation = /** @class */ (function () {
     function GridLocation(x, y, z) {
         if (x === void 0) { x = 0; }
         if (y === void 0) { y = 0; }
@@ -52,9 +86,29 @@ var GridLocation = (function () {
     GridLocation.prototype.distanceFrom = function (o) {
         return (Math.abs(this.x - o.x) + Math.abs(this.y - o.y) + Math.abs(this.z - o.z)) / 2;
     };
+    GridLocation.prototype.offsetBy = function (o) {
+        return new GridLocation(this.x + o.dx, this.y + o.dy, this.z + o.dz);
+    };
+    GridLocation.prototype.toString = function () {
+        return "at".concat(this.x, "_").concat(this.y, "_").concat(this.z);
+    };
     return GridLocation;
-})();
-var Vec2 = (function () {
+}());
+var GridDirection = /** @class */ (function () {
+    function GridDirection(dx, dy, dz) {
+        if (dx === void 0) { dx = 0; }
+        if (dy === void 0) { dy = 0; }
+        if (dz === void 0) { dz = 0; }
+        this.dx = dx;
+        this.dy = dy;
+        this.dz = dz;
+    }
+    GridDirection.prototype.toString = function () {
+        return "dir".concat(this.dx, "_").concat(this.dy, "_").concat(this.dz);
+    };
+    return GridDirection;
+}());
+var Vec2 = /** @class */ (function () {
     function Vec2(x, y) {
         if (x === void 0) { x = 0; }
         if (y === void 0) { y = 0; }
@@ -62,14 +116,21 @@ var Vec2 = (function () {
         this.y = y;
     }
     return Vec2;
-})();
-var Board = (function () {
-    function Board(hexesXy) {
+}());
+var kNeighborOffsets = [
+    new GridDirection(1, -1, 0),
+    new GridDirection(1, 0, -1),
+    new GridDirection(-1, 1, 0),
+    new GridDirection(-1, 0, 1),
+    new GridDirection(0, 1, -1),
+    new GridDirection(0, -1, 1)
+];
+var Board = /** @class */ (function () {
+    function Board(hexesXy, ports) {
         this.hexesXy = hexesXy;
+        this.ports = ports;
     }
-    Board.prototype.getHexesXy = function () {
-        return this.hexesXy;
-    };
+    Board.prototype.getHexesXy = function () { return this.hexesXy; };
     Board.prototype.forEach = function (f, context) {
         var i = 0;
         for (var x = this.hexesXy.getLowerIndex(); x <= this.hexesXy.getUpperIndex(); x++) {
@@ -102,7 +163,7 @@ var Board = (function () {
             }
             newHexesXy.put(x, newYLine);
         }
-        return new Board(newHexesXy);
+        return new Board(newHexesXy, __assign({}, this.ports));
     };
     Board.prototype.getTiles = function () {
         var result = new Array();
@@ -113,6 +174,42 @@ var Board = (function () {
         var result = new Array();
         this.forEachInterior(function (tile) { return result.push(tile); });
         return result;
+    };
+    Board.prototype.getEdgeTiles = function () {
+        var _this = this;
+        var edgeTiles = new Array();
+        this.forEach(function (tile) {
+            var neighbors = _this.getNeighbors(tile);
+            var hasWaterNeighbor = false;
+            neighbors.forEach(function (n) {
+                if (n.getType() === TileType.Water) {
+                    hasWaterNeighbor = true;
+                }
+            });
+            if (hasWaterNeighbor && tile.getType() != TileType.Water) {
+                edgeTiles.push(tile);
+            }
+        });
+        return edgeTiles;
+    };
+    Board.prototype.getShorelines = function () {
+        var _this = this;
+        var edgeTiles = this.getEdgeTiles();
+        var shorelines = [];
+        edgeTiles.forEach(function (tile) {
+            var p = tile.getPosition();
+            kNeighborOffsets.forEach(function (offset) {
+                var q = p.offsetBy(offset);
+                var n = _this.getTileWithLocation(q);
+                if (n.getType() === TileType.Water) {
+                    shorelines.push(new Shoreline(tile, offset));
+                }
+            });
+        });
+        return shorelines;
+    };
+    Board.prototype.getTileWithLocation = function (p) {
+        return this.getTile(p.x, p.y, p.z);
     };
     Board.prototype.getTile = function (x, y, z) {
         if (typeof (z) !== "undefined") {
@@ -146,8 +243,8 @@ var Board = (function () {
         return neighbors;
     };
     return Board;
-})();
-var BoardGenerator = (function () {
+}());
+var BoardGenerator = /** @class */ (function () {
     function BoardGenerator() {
     }
     BoardGenerator.prototype.generateCircularBoard = function (n) {
@@ -165,11 +262,11 @@ var BoardGenerator = (function () {
             }
             hexesXy.put(x, hexesY);
         }
-        return new Board(hexesXy);
+        return new Board(hexesXy, []);
     };
     return BoardGenerator;
-})();
-var BoardDimension = (function () {
+}());
+var BoardDimension = /** @class */ (function () {
     function BoardDimension(minIndex, maxIndex) {
         this.minIndex = minIndex;
         this.maxIndex = maxIndex;
@@ -186,39 +283,23 @@ var BoardDimension = (function () {
             return null;
         }
     };
-    BoardDimension.prototype.getLowerIndex = function () {
-        return this.minIndex;
-    };
-    BoardDimension.prototype.getUpperIndex = function () {
-        return this.maxIndex;
-    };
+    BoardDimension.prototype.getLowerIndex = function () { return this.minIndex; };
+    BoardDimension.prototype.getUpperIndex = function () { return this.maxIndex; };
     return BoardDimension;
-})();
-var Hex = (function () {
+}());
+var Hex = /** @class */ (function () {
     function Hex(position, boundary) {
         this.position = position;
         this.boundary = boundary;
-        this.type = 8 /* Undefined */;
+        this.type = TileType.Undefined;
         this.number = 0;
     }
-    Hex.prototype.isBoundary = function () {
-        return this.boundary;
-    };
-    Hex.prototype.getPosition = function () {
-        return this.position;
-    };
-    Hex.prototype.getType = function () {
-        return this.type;
-    };
-    Hex.prototype.setType = function (value) {
-        this.type = value;
-    };
-    Hex.prototype.getNumber = function () {
-        return this.number;
-    };
-    Hex.prototype.setNumber = function (value) {
-        this.number = value;
-    };
+    Hex.prototype.isBoundary = function () { return this.boundary; };
+    Hex.prototype.getPosition = function () { return this.position; };
+    Hex.prototype.getType = function () { return this.type; };
+    Hex.prototype.setType = function (value) { this.type = value; };
+    Hex.prototype.getNumber = function () { return this.number; };
+    Hex.prototype.setNumber = function (value) { this.number = value; };
     Hex.prototype.clone = function () {
         var newHex = new Hex(new GridLocation(this.position.x, this.position.y, this.position.z), this.boundary);
         newHex.setType(this.getType());
@@ -226,8 +307,18 @@ var Hex = (function () {
         return newHex;
     };
     return Hex;
-})();
-var BoardRenderer = (function () {
+}());
+var Shoreline = /** @class */ (function () {
+    function Shoreline(hex, direction) {
+        this.hex = hex;
+        this.direction = direction;
+    }
+    Shoreline.prototype.buildKey = function () {
+        return this.hex.getPosition().toString() + "" + this.direction.toString();
+    };
+    return Shoreline;
+}());
+var BoardRenderer = /** @class */ (function () {
     function BoardRenderer(canvas, context) {
         this.canvas = canvas;
         this.context = context;
@@ -325,23 +416,14 @@ var BoardRenderer = (function () {
         this.context.setTransform(1, 0, 0, 1, 1100, 650);
         scrollingGraph.render(this.context, 0, 0, 200, 100);
         board.forEach(function (hex) {
-            var position = hex.getPosition();
-            var screenCoordinates = position.toScreenCoordinates();
-            _this.context.fillStyle = kTileColors[hex.getType()] || "#FF00FF";
             _this.context.setTransform(1, 0, 0, 1, 500, 400);
             _this.context.strokeStyle = "#000000";
-            _this.context.beginPath();
-            _this.context.moveTo(screenCoordinates.x, screenCoordinates.y);
-            _this.context.lineTo(screenCoordinates.x + kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2);
-            _this.context.lineTo(screenCoordinates.x + kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2 + kTileSide);
-            _this.context.lineTo(screenCoordinates.x, screenCoordinates.y + kTileSide * 2);
-            _this.context.lineTo(screenCoordinates.x - kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2 + kTileSide);
-            _this.context.lineTo(screenCoordinates.x - kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2);
-            _this.context.lineTo(screenCoordinates.x, screenCoordinates.y);
-            _this.context.closePath();
+            _this.context.fillStyle = kTileColors[hex.getType()] || "#FF00FF";
+            _this.hexPath(hex);
             _this.context.fill();
             _this.context.stroke();
-            if (hex.getType() !== 0 /* Water */ && hex.getType() !== 1 /* Desert */) {
+            if (hex.getType() !== TileType.Water && hex.getType() !== TileType.Desert) {
+                var screenCoordinates = hex.getPosition().toScreenCoordinates();
                 var fontSize = 20;
                 _this.context.fillStyle = "#000000";
                 _this.context.font = fontSize + "px 'segoe ui'";
@@ -354,32 +436,58 @@ var BoardRenderer = (function () {
             var colorHex = (~~(255 * weight / 5)).toString(16);
             if (colorHex.length === 1)
                 colorHex = "0" + colorHex;
-            _this.context.fillStyle = "#" + colorHex + colorHex + colorHex;
             _this.context.setTransform(0.5, 0, 0, 0.5, 1150, 200);
             _this.context.strokeStyle = "#000000";
-            _this.context.beginPath();
-            _this.context.moveTo(screenCoordinates.x, screenCoordinates.y);
-            _this.context.lineTo(screenCoordinates.x + kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2);
-            _this.context.lineTo(screenCoordinates.x + kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2 + kTileSide);
-            _this.context.lineTo(screenCoordinates.x, screenCoordinates.y + kTileSide * 2);
-            _this.context.lineTo(screenCoordinates.x - kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2 + kTileSide);
-            _this.context.lineTo(screenCoordinates.x - kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2);
-            _this.context.lineTo(screenCoordinates.x, screenCoordinates.y);
-            _this.context.closePath();
+            _this.context.fillStyle = "#" + colorHex + colorHex + colorHex;
+            _this.hexPath(hex);
             _this.context.fill();
             _this.context.stroke();
         }, this);
+        var shorelines = board.getShorelines();
+        shorelines.forEach(function (shoreline) {
+            var hex = shoreline.hex;
+            var hexPosition = hex.getPosition();
+            var direction = shoreline.direction;
+            var neighbor = board.getTileWithLocation(hexPosition.offsetBy(direction));
+            var positionA = hexPosition.toScreenCoordinates();
+            var positionB = neighbor.getPosition().toScreenCoordinates();
+            _this.context.setTransform(1, 0, 0, 1, 500, 400);
+            _this.context.strokeStyle = "#000000";
+            _this.context.beginPath();
+            _this.context.moveTo(positionA.x, positionA.y + kTileSide);
+            _this.context.lineTo(positionB.x, positionB.y + kTileSide);
+            _this.context.closePath();
+            _this.context.stroke();
+        });
+    };
+    BoardRenderer.prototype.hexPath = function (hex) {
+        var position = hex.getPosition();
+        var screenCoordinates = position.toScreenCoordinates();
+        this.context.beginPath();
+        this.context.moveTo(screenCoordinates.x, screenCoordinates.y);
+        this.context.lineTo(screenCoordinates.x + kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2);
+        this.context.lineTo(screenCoordinates.x + kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2 + kTileSide);
+        this.context.lineTo(screenCoordinates.x, screenCoordinates.y + kTileSide * 2);
+        this.context.lineTo(screenCoordinates.x - kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2 + kTileSide);
+        this.context.lineTo(screenCoordinates.x - kTileSide * Math.sqrt(3) / 2, screenCoordinates.y + kTileSide / 2);
+        this.context.lineTo(screenCoordinates.x, screenCoordinates.y);
+        this.context.closePath();
     };
     return BoardRenderer;
-})();
-var IterationResult = (function () {
+}());
+var IterationDebugInfo = /** @class */ (function () {
+    function IterationDebugInfo() {
+    }
+    return IterationDebugInfo;
+}());
+var IterationResult = /** @class */ (function () {
     function IterationResult(board, score) {
         this.board = board;
         this.score = score;
     }
     return IterationResult;
-})();
-var MapGenerator = (function () {
+}());
+var MapGenerator = /** @class */ (function () {
     function MapGenerator() {
     }
     MapGenerator.prototype.randomizeBoard = function (board, interiorWaterFraction) {
@@ -387,19 +495,18 @@ var MapGenerator = (function () {
         var desertCount = 2;
         var interiorTileCount = 0;
         board.forEachInterior(function (tile) { return interiorTileCount++; });
-        board.forEach(function (tile) {
-            if (tile.isBoundary())
-                tile.setType(0 /* Water */);
-        });
+        board.forEach(function (tile) { if (tile.isBoundary())
+            tile.setType(TileType.Water); });
         var waterTileCount = ~~(interiorWaterFraction * interiorTileCount);
         var nonwaterTileCount = interiorTileCount - waterTileCount;
         var resourceTileCount = interiorTileCount - waterTileCount - desertCount;
         var numberNormalize = 0.8;
         var numbers = [];
+        shuffle(kDesiredNumberDistribution);
         for (var i = 0; i < ~~(resourceTileCount * numberNormalize); i++) {
-            var number = i % 10 + 2;
-            if (number >= 7)
-                number++;
+            // var number = i % 10 + 2;
+            // if (number >= 7) number++;
+            var number = kDesiredNumberDistribution[i % kDesiredNumberDistribution.length];
             numbers.push(number);
         }
         while (numbers.length < resourceTileCount) {
@@ -411,7 +518,7 @@ var MapGenerator = (function () {
         if (numbers.length != resourceTileCount) {
             throw new Error("Check number distribution code: " + numbers.length + " " + resourceTileCount);
         }
-        var types = [1 /* Desert */, 1 /* Desert */, 2 /* Gold */, 2 /* Gold */, 2 /* Gold */];
+        var types = [TileType.Desert, TileType.Desert, TileType.Gold, TileType.Gold, TileType.Gold];
         var typeNormalize = 0.8;
         var requiredTilesPerType = ~~(typeNormalize * (nonwaterTileCount - types.length) / resourceTileTypes.length);
         for (var i = 0; i < resourceTileTypes.length; i++) {
@@ -428,7 +535,7 @@ var MapGenerator = (function () {
         shuffle(numbers);
         shuffle(types);
         for (var i = 0; i < waterTileCount; i++) {
-            types.push(0 /* Water */);
+            types.push(TileType.Water);
         }
         shuffle(types);
         if (types.length != interiorTileCount) {
@@ -437,34 +544,22 @@ var MapGenerator = (function () {
         var numberIndex = 0;
         board.forEachInterior(function (tile, i) {
             tile.setType(types[i]);
-            if (types[i] === 0 /* Water */ || types[i] === 1 /* Desert */) {
+            if (types[i] === TileType.Water || types[i] === TileType.Desert) {
                 tile.setNumber(0);
             }
             else {
                 tile.setNumber(numbers[numberIndex++]);
             }
         });
-    };
-    MapGenerator.prototype.getBoardEdgeTiles = function (board) {
-        var edgeTiles = new Array();
-        board.forEach(function (tile) {
-            var neighbors = board.getNeighbors(tile);
-            var hasWaterNeighbor = false;
-            neighbors.forEach(function (n) {
-                if (n.getType() === 0 /* Water */) {
-                    hasWaterNeighbor = true;
-                }
-            });
-            if (hasWaterNeighbor && tile.getType() != 0 /* Water */) {
-                edgeTiles.push(tile);
-            }
-        });
-        return edgeTiles;
+        var shorelines = board.getShorelines();
+        console.log("SHORELINES", shorelines);
+        return board;
     };
     MapGenerator.prototype.iterateBoard = function (board, iterations) {
         if (iterations === void 0) { iterations = 10; }
         var initialTiles = board.getTiles();
-        var edgeTiles = this.getBoardEdgeTiles(board);
+        var edgeTiles = board.getEdgeTiles();
+        var shorelines = board.getShorelines();
         var initialScore = this.scoreBoard(board, initialTiles);
         var bestScore = initialScore;
         for (var i = 0; i < iterations; i++) {
@@ -491,7 +586,8 @@ var MapGenerator = (function () {
     MapGenerator.prototype.iterateBoardSwapNumbers = function (board, interiorTiles) {
         var first = interiorTiles[~~(Math.random() * interiorTiles.length)];
         var second = interiorTiles[~~(Math.random() * interiorTiles.length)];
-        if (first.getType() === 0 /* Water */ || second.getType() === 0 /* Water */ || first.getType() === 1 /* Desert */ || second.getType() === 1 /* Desert */) {
+        if (first.getType() === TileType.Water || second.getType() === TileType.Water ||
+            first.getType() === TileType.Desert || second.getType() === TileType.Desert) {
             return;
         }
         var temp = first.getNumber();
@@ -501,10 +597,10 @@ var MapGenerator = (function () {
     MapGenerator.prototype.iterateBoardSwapTypes = function (board, interiorTiles) {
         var first = interiorTiles[~~(Math.random() * interiorTiles.length)];
         var second = interiorTiles[~~(Math.random() * interiorTiles.length)];
-        if (first.getType() === 0 /* Water */ || second.getType() === 0 /* Water */) {
+        if (first.getType() === TileType.Water || second.getType() === TileType.Water) {
             return;
         }
-        if (first.getType() === 1 /* Desert */ || second.getType() === 1 /* Desert */) {
+        if (first.getType() === TileType.Desert || second.getType() === TileType.Desert) {
             var firstValue = first.getNumber();
             first.setNumber(second.getNumber());
             second.setNumber(firstValue);
@@ -521,7 +617,7 @@ var MapGenerator = (function () {
             var hexPower = 0;
             interiorTiles.forEach(function (tileB) {
                 if (tileA !== tileB) {
-                    var weight = kWeightsByNumber[tileA.getNumber()] * kWeightsByNumber[tileB.getNumber()];
+                    var weight = kWeightsByNumber[tileA.getNumber()] + kWeightsByNumber[tileB.getNumber()];
                     var multiplier = _this.rateHexPair(tileA, tileB);
                     hexPower += Math.pow(weight * multiplier, 2);
                 }
@@ -535,7 +631,7 @@ var MapGenerator = (function () {
             return this.rateHexPair(b, a);
         }
         var distance = a.getPosition().distanceFrom(b.getPosition());
-        if (distance > 3) {
+        if (distance >= 1.9) {
             return 0;
         }
         var weight = 1 / Math.pow(a.getPosition().distanceFrom(b.getPosition()), 2);
@@ -549,41 +645,45 @@ var MapGenerator = (function () {
         */
         var multiplier = 1;
         if (aType === bType) {
-            if (aType === 2 /* Gold */) {
+            if (aType === TileType.Gold) {
                 multiplier = 100.0;
             }
-            else if (aType === 3 /* Wood */) {
+            else if (aType === TileType.Wood) {
                 multiplier = 1.8;
             }
-            else if (aType === 5 /* Sheep */) {
+            else if (aType === TileType.Sheep) {
                 multiplier = 2.8;
             }
-            else if (aType === 7 /* Wheat */) {
+            else if (aType === TileType.Wheat) {
                 multiplier = 2.5;
             }
-            else if (aType === 6 /* Ore */) {
+            else if (aType === TileType.Ore) {
                 multiplier = 2.8;
             }
-            else if (aType === 4 /* Clay */) {
+            else if (aType === TileType.Clay) {
                 multiplier = 1.8;
             }
         }
-        else if (aType === 3 /* Wood */ && bType === 4 /* Clay */) {
+        else if (aType === TileType.Wood && bType === TileType.Clay) {
             multiplier = 1.8;
         }
-        else if (aType === 6 /* Ore */ && bType === 7 /* Wheat */) {
+        else if (aType === TileType.Ore && bType === TileType.Wheat) {
             multiplier = 1.8;
         }
-        else if (aType === 1 /* Desert */) {
+        else if (aType === TileType.Desert) {
             multiplier = 0.0;
         }
-        else if (aType === 0 /* Water */) {
+        else if (aType === TileType.Water) {
             multiplier = 3;
+            //         multiplier = 8.0;
         }
-        else if (aType === 2 /* Gold */) {
-            multiplier = 1.2;
+        else if (aType === TileType.Gold) {
+            var distanceFrom7 = Math.abs(a.getNumber() - 7);
+            // discourage 6/8 and 2/12 golds. Bias toward 3s.
+            //            7   6    5    4    3    2
+            multiplier = [-1, 1.3, 1.2, 1.2, 1.1, 1.6][distanceFrom7];
         }
-        else if (aType === 5 /* Sheep */ && (bType === 7 /* Wheat */ || bType === 6 /* Ore */)) {
+        else if (aType === TileType.Sheep && (bType === TileType.Wheat || bType === TileType.Ore)) {
             multiplier = 1.2;
         }
         if (a.getNumber() === b.getNumber() && distance === 1) {
@@ -592,8 +692,8 @@ var MapGenerator = (function () {
         return 1 + multiplier * weight;
     };
     return MapGenerator;
-})();
-var SlidingGraph = (function () {
+}());
+var SlidingGraph = /** @class */ (function () {
     function SlidingGraph(width, height) {
         this.width = width;
         this.height = height;
@@ -633,17 +733,17 @@ var SlidingGraph = (function () {
         }
     };
     return SlidingGraph;
-})();
-var Application = (function () {
+}());
+var Application = /** @class */ (function () {
     function Application(canvas) {
         this.canvas = canvas;
     }
     Application.prototype.run = function () {
         this.context = this.canvas.getContext("2d");
         var boardGenerator = new BoardGenerator();
-        var board = boardGenerator.generateCircularBoard(5);
+        var board = boardGenerator.generateCircularBoard(4);
         var mapGenerator = new MapGenerator();
-        mapGenerator.randomizeBoard(board, 0.5);
+        mapGenerator.randomizeBoard(board, 0.15);
         var boardRenderer = new BoardRenderer(this.canvas, this.context);
         var scrollingGraph = new SlidingGraph(200, 100);
         var iterations = 0;
@@ -658,7 +758,7 @@ var Application = (function () {
         }, 1);
     };
     return Application;
-})();
+}());
 function shuffle(o) {
     for (var j, x, i = o.length; i; j = Math.floor(Math.random() * i), x = o[--i], o[i] = o[j], o[j] = x)
         ;
