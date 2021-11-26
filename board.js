@@ -573,7 +573,7 @@ var MapGenerator = /** @class */ (function () {
         });
         var allShorelines = board.getShorelines();
         shuffle(allShorelines);
-        var shorelines = allShorelines.splice(0, portTileTypesBag.length + 10);
+        var shorelines = allShorelines.splice(0, portTileTypesBag.length + 3);
         var ports = {};
         for (var i = 0; i < shorelines.length; i++) {
             ports[shorelines[i].buildKey()] = portTileTypesBag[i % portTileTypesBag.length];
@@ -797,9 +797,9 @@ var Application = /** @class */ (function () {
     Application.prototype.run = function () {
         this.context = this.canvas.getContext("2d");
         var boardGenerator = new BoardGenerator();
-        var board = boardGenerator.generateCircularBoard(6);
+        var board = boardGenerator.generateCircularBoard(4);
         var mapGenerator = new MapGenerator();
-        mapGenerator.randomizeBoard(board, 0.6);
+        mapGenerator.randomizeBoard(board, 0.2);
         var boardRenderer = new BoardRenderer(this.canvas, this.context);
         var scrollingGraph = new SlidingGraph(200, 100);
         var iterations = 0;

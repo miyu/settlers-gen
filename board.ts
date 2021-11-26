@@ -595,7 +595,7 @@ class MapGenerator {
       const allShorelines = board.getShorelines();
       shuffle(allShorelines);
 
-      const shorelines = allShorelines.splice(0, portTileTypesBag.length + 10);
+      const shorelines = allShorelines.splice(0, portTileTypesBag.length + 3);
       const ports = {};
       for (var i = 0; i < shorelines.length; i++) {
         ports[shorelines[i].buildKey()] = portTileTypesBag[i % portTileTypesBag.length];
@@ -830,9 +830,9 @@ class Application {
       this.context = this.canvas.getContext("2d");
 
       var boardGenerator = new BoardGenerator();
-      var board = boardGenerator.generateCircularBoard(6);
+      var board = boardGenerator.generateCircularBoard(4);
       var mapGenerator = new MapGenerator();
-      mapGenerator.randomizeBoard(board, 0.6);
+      mapGenerator.randomizeBoard(board, 0.2);
       var boardRenderer = new BoardRenderer(this.canvas, this.context);
       var scrollingGraph = new SlidingGraph(200, 100);
 
