@@ -57,6 +57,16 @@ var interiorTileTypes = [TileType.Desert, TileType.Gold, TileType.Wood, TileType
 var resourceTileTypes = [TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
 var portTileTypesBag = [...resourceTileTypes, TileType.Wildcard, TileType.Wildcard, TileType.Wildcard];
 
+const seafarersTiles = {};
+seafarersTiles[TileType.Water] = 19;
+seafarersTiles[TileType.Desert] = 2;
+seafarersTiles[TileType.Gold] = 2;
+seafarersTiles[TileType.Wood] = 1;
+seafarersTiles[TileType.Clay] = 2;
+seafarersTiles[TileType.Sheep] = 1;
+seafarersTiles[TileType.Ore] = 2;
+seafarersTiles[TileType.Wheat] = 1;
+
 class GridLocation {
    constructor(
       public x: number = 0,
@@ -246,22 +256,41 @@ class Board {
 
 class BoardGenerator {
    public generateCircularBoard(n: number = 3): Board {
-      var hexesXy = new BoardDimension<BoardDimension<Hex>>(-n, n);
-      for (var x = -n; x <= n; x++) {
-         var minY = Math.max(-n, -x - n);
-         var maxY = Math.min(n, -x + n);
-         var hexesY = new BoardDimension<Hex>(minY, maxY);
-         for (var y = hexesY.getLowerIndex(); y <= hexesY.getUpperIndex(); y++) {
-            var z = - x - y;
-            var position = new GridLocation(x, y, z);
-            var boundary = y === hexesY.getLowerIndex() || y === hexesY.getUpperIndex() || x === -n || x === n;
-            hexesY.put(y, new Hex(position, boundary));
-         }
-         hexesXy.put(x, hexesY);
-      }
-
-      return new Board(hexesXy, {});
+     return this.generateWideBoard(n, n);
+      // var hexesXy = new BoardDimension<BoardDimension<Hex>>(-n, n);
+      // for (var x = -n; x <= n; x++) {
+      //    var minY = Math.max(-n, -x - n);
+      //    var maxY = Math.min(n, -x + n);
+      //    var hexesY = new BoardDimension<Hex>(minY, maxY);
+      //    for (var y = hexesY.getLowerIndex(); y <= hexesY.getUpperIndex(); y++) {
+      //       var z = - x - y;
+      //       var position = new GridLocation(x, y, z);
+      //       var boundary = y === hexesY.getLowerIndex() || y === hexesY.getUpperIndex() || x === -n || x === n;
+      //       hexesY.put(y, new Hex(position, boundary));
+      //    }
+      //    hexesXy.put(x, hexesY);
+      // }
+      //
+      // return new Board(hexesXy, {});
    }
+
+    public generateWideBoard(n: number = 3, m: number = 6): Board {
+       var hexesXy = new BoardDimension<BoardDimension<Hex>>(-n, n);
+       for (var x = -n; x <= n; x++) {
+          var minY = Math.max(-m, -x - m);
+          var maxY = Math.min(m, -x + m);
+          var hexesY = new BoardDimension<Hex>(minY, maxY);
+          for (var y = hexesY.getLowerIndex(); y <= hexesY.getUpperIndex(); y++) {
+             var z = - x - y;
+             var position = new GridLocation(x, y, z);
+             var boundary = y === hexesY.getLowerIndex() || y === hexesY.getUpperIndex() || x === -n || x === n;
+             hexesY.put(y, new Hex(position, boundary));
+          }
+          hexesXy.put(x, hexesY);
+       }
+
+       return new Board(hexesXy, {});
+    }
 }
 
 class BoardDimension<T> {
@@ -337,7 +366,7 @@ class BoardRenderer {
       this.context.fillText(iterations.toString(), 10, fontSize);
       this.context.stroke();
 
-      this.context.setTransform(1, 0, 0, 1, 1000, 550);
+      this.context.setTransform(1, 0, 0, 1, 1000, 750);
       this.context.fillStyle = "#000000";
       var tilesByNumber = {};
       var tilesByType = {};
@@ -400,7 +429,7 @@ class BoardRenderer {
          }
       }
 
-      this.context.setTransform(1, 0, 0, 1, 1100, 500);
+      this.context.setTransform(1, 0, 0, 1, 1100, 700);
       var typeFrequencyGraphHeight = 100;
       this.context.fillStyle = "#444444";
       this.context.fillRect(0, 0, 100, typeFrequencyGraphHeight);
@@ -425,12 +454,12 @@ class BoardRenderer {
          this.context.fillRect(10 * i, typeFrequencyGraphHeight - blockHeight, 10, blockHeight);
       }
 
-      this.context.setTransform(1, 0, 0, 1, 1100, 650);
+      this.context.setTransform(1, 0, 0, 1, 1100, 850);
       scrollingGraph.render(this.context, 0, 0, 200, 100);
 
       board.forEach(
          (hex) => {
-            this.context.setTransform(1, 0, 0, 1, 500, 400);
+            this.context.setTransform(1, 0, 0, 1, 500, 500);
             this.context.lineWidth = 1;
             this.context.strokeStyle = "#000000";
             this.context.fillStyle = kTileColors[hex.getType()] || "#FF00FF";
@@ -452,7 +481,7 @@ class BoardRenderer {
             var weight = kWeightsByNumber[hex.getNumber()];
             var colorHex = (~~(255 * weight / 5)).toString(16);
             if (colorHex.length === 1) colorHex = "0" + colorHex;
-            this.context.setTransform(0.5, 0, 0, 0.5, 1150, 200);
+            this.context.setTransform(0.5, 0, 0, 0.5, 1150, 300);
             this.context.lineWidth = 1;
             this.context.strokeStyle = "#000000";
             this.context.fillStyle = "#" + colorHex + colorHex + colorHex;
@@ -476,7 +505,7 @@ class BoardRenderer {
         const positionA = hexPosition.toScreenCoordinates();
         const positionB = neighbor.getPosition().toScreenCoordinates();
 
-        this.context.setTransform(1, 0, 0, 1, 500, 400);
+        this.context.setTransform(1, 0, 0, 1, 500, 500);
         this.context.lineWidth = 3;
         console.log(key + ": " + portType + " " + kTileColors[portType]);
         this.context.strokeStyle = kTileColors[portType]; // "#000000";
@@ -524,8 +553,7 @@ class IterationResult {
 }
 
 class MapGenerator {
-   public randomizeBoard(board: Board, interiorWaterFraction: number = 0.0): void {
-      var desertCount = 2;
+   public randomizeBoard(board: Board, interiorWaterFraction: number = 0.0, portCountPadding: number = 3, desertCount: number = 2, goldCount: number = 3): void {
       var interiorTileCount = 0;
       board.forEachInterior(tile => interiorTileCount++);
       board.forEach(tile => { if (tile.isBoundary()) tile.setType(TileType.Water); });
@@ -552,7 +580,10 @@ class MapGenerator {
          throw new Error("Check number distribution code: " + numbers.length + " " + resourceTileCount);
       }
 
-      var types = [TileType.Desert, TileType.Desert, TileType.Gold, TileType.Gold, TileType.Gold];
+      var types = []; //TileType.Desert, TileType.Desert, TileType.Gold, TileType.Gold, TileType.Gold];
+      for (var i = 0; i < desertCount; i++) types.push(TileType.Desert);
+      for (var i = 0; i < goldCount; i++) types.push(TileType.Gold);
+
       var typeNormalize = 0.8;
       var requiredTilesPerType = ~~(typeNormalize * (nonwaterTileCount - types.length) / resourceTileTypes.length);
       for (var i = 0; i < resourceTileTypes.length; i++) {
@@ -594,7 +625,7 @@ class MapGenerator {
 
       const allShorelines = board.getShorelines();
 
-      var numPorts = portTileTypesBag.length + 3;
+      var numPorts = portTileTypesBag.length + portCountPadding;
       var shorelines = [];
       for (var i = 0; i < numPorts; i++) {
         const s = allShorelines[~~(i * allShorelines.length / numPorts)];
@@ -838,9 +869,10 @@ class Application {
       this.context = this.canvas.getContext("2d");
 
       var boardGenerator = new BoardGenerator();
-      var board = boardGenerator.generateCircularBoard(4);
+      // var board = boardGenerator.generateWideBoard(4, 6);
+      var board = boardGenerator.generateWideBoard(4, 4);
       var mapGenerator = new MapGenerator();
-      mapGenerator.randomizeBoard(board, 0.2);
+      mapGenerator.randomizeBoard(board, 0.2, 8, 1, 2);
       var boardRenderer = new BoardRenderer(this.canvas, this.context);
       var scrollingGraph = new SlidingGraph(200, 100);
 

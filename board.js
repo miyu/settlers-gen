@@ -72,6 +72,15 @@ var allTileTypes = [TileType.Water, TileType.Desert, TileType.Wood, TileType.Cla
 var interiorTileTypes = [TileType.Desert, TileType.Gold, TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
 var resourceTileTypes = [TileType.Wood, TileType.Clay, TileType.Sheep, TileType.Ore, TileType.Wheat];
 var portTileTypesBag = __spreadArray(__spreadArray([], resourceTileTypes, true), [TileType.Wildcard, TileType.Wildcard, TileType.Wildcard], false);
+var seafarersTiles = {};
+seafarersTiles[TileType.Water] = 19;
+seafarersTiles[TileType.Desert] = 2;
+seafarersTiles[TileType.Gold] = 2;
+seafarersTiles[TileType.Wood] = 1;
+seafarersTiles[TileType.Clay] = 2;
+seafarersTiles[TileType.Sheep] = 1;
+seafarersTiles[TileType.Ore] = 2;
+seafarersTiles[TileType.Wheat] = 1;
 var GridLocation = /** @class */ (function () {
     function GridLocation(x, y, z) {
         if (x === void 0) { x = 0; }
@@ -254,10 +263,30 @@ var BoardGenerator = /** @class */ (function () {
     }
     BoardGenerator.prototype.generateCircularBoard = function (n) {
         if (n === void 0) { n = 3; }
+        return this.generateWideBoard(n, n);
+        // var hexesXy = new BoardDimension<BoardDimension<Hex>>(-n, n);
+        // for (var x = -n; x <= n; x++) {
+        //    var minY = Math.max(-n, -x - n);
+        //    var maxY = Math.min(n, -x + n);
+        //    var hexesY = new BoardDimension<Hex>(minY, maxY);
+        //    for (var y = hexesY.getLowerIndex(); y <= hexesY.getUpperIndex(); y++) {
+        //       var z = - x - y;
+        //       var position = new GridLocation(x, y, z);
+        //       var boundary = y === hexesY.getLowerIndex() || y === hexesY.getUpperIndex() || x === -n || x === n;
+        //       hexesY.put(y, new Hex(position, boundary));
+        //    }
+        //    hexesXy.put(x, hexesY);
+        // }
+        //
+        // return new Board(hexesXy, {});
+    };
+    BoardGenerator.prototype.generateWideBoard = function (n, m) {
+        if (n === void 0) { n = 3; }
+        if (m === void 0) { m = 6; }
         var hexesXy = new BoardDimension(-n, n);
         for (var x = -n; x <= n; x++) {
-            var minY = Math.max(-n, -x - n);
-            var maxY = Math.min(n, -x + n);
+            var minY = Math.max(-m, -x - m);
+            var maxY = Math.min(m, -x + m);
             var hexesY = new BoardDimension(minY, maxY);
             for (var y = hexesY.getLowerIndex(); y <= hexesY.getUpperIndex(); y++) {
                 var z = -x - y;
@@ -338,7 +367,7 @@ var BoardRenderer = /** @class */ (function () {
         this.context.textAlign = 'left';
         this.context.fillText(iterations.toString(), 10, fontSize);
         this.context.stroke();
-        this.context.setTransform(1, 0, 0, 1, 1000, 550);
+        this.context.setTransform(1, 0, 0, 1, 1000, 750);
         this.context.fillStyle = "#000000";
         var tilesByNumber = {};
         var tilesByType = {};
@@ -397,7 +426,7 @@ var BoardRenderer = /** @class */ (function () {
                 }
             }
         }
-        this.context.setTransform(1, 0, 0, 1, 1100, 500);
+        this.context.setTransform(1, 0, 0, 1, 1100, 700);
         var typeFrequencyGraphHeight = 100;
         this.context.fillStyle = "#444444";
         this.context.fillRect(0, 0, 100, typeFrequencyGraphHeight);
@@ -418,10 +447,10 @@ var BoardRenderer = /** @class */ (function () {
             var blockHeight = typeFrequencyGraphHeight * (groupSum / maximumTypeCount);
             this.context.fillRect(10 * i, typeFrequencyGraphHeight - blockHeight, 10, blockHeight);
         }
-        this.context.setTransform(1, 0, 0, 1, 1100, 650);
+        this.context.setTransform(1, 0, 0, 1, 1100, 850);
         scrollingGraph.render(this.context, 0, 0, 200, 100);
         board.forEach(function (hex) {
-            _this.context.setTransform(1, 0, 0, 1, 500, 400);
+            _this.context.setTransform(1, 0, 0, 1, 500, 500);
             _this.context.lineWidth = 1;
             _this.context.strokeStyle = "#000000";
             _this.context.fillStyle = kTileColors[hex.getType()] || "#FF00FF";
@@ -442,7 +471,7 @@ var BoardRenderer = /** @class */ (function () {
             var colorHex = (~~(255 * weight / 5)).toString(16);
             if (colorHex.length === 1)
                 colorHex = "0" + colorHex;
-            _this.context.setTransform(0.5, 0, 0, 0.5, 1150, 200);
+            _this.context.setTransform(0.5, 0, 0, 0.5, 1150, 300);
             _this.context.lineWidth = 1;
             _this.context.strokeStyle = "#000000";
             _this.context.fillStyle = "#" + colorHex + colorHex + colorHex;
@@ -462,7 +491,7 @@ var BoardRenderer = /** @class */ (function () {
             var neighbor = board.getTileWithLocation(hexPosition.offsetBy(direction));
             var positionA = hexPosition.toScreenCoordinates();
             var positionB = neighbor.getPosition().toScreenCoordinates();
-            _this.context.setTransform(1, 0, 0, 1, 500, 400);
+            _this.context.setTransform(1, 0, 0, 1, 500, 500);
             _this.context.lineWidth = 3;
             console.log(key + ": " + portType + " " + kTileColors[portType]);
             _this.context.strokeStyle = kTileColors[portType]; // "#000000";
@@ -510,9 +539,11 @@ var IterationResult = /** @class */ (function () {
 var MapGenerator = /** @class */ (function () {
     function MapGenerator() {
     }
-    MapGenerator.prototype.randomizeBoard = function (board, interiorWaterFraction) {
+    MapGenerator.prototype.randomizeBoard = function (board, interiorWaterFraction, portCountPadding, desertCount, goldCount) {
         if (interiorWaterFraction === void 0) { interiorWaterFraction = 0.0; }
-        var desertCount = 2;
+        if (portCountPadding === void 0) { portCountPadding = 3; }
+        if (desertCount === void 0) { desertCount = 2; }
+        if (goldCount === void 0) { goldCount = 3; }
         var interiorTileCount = 0;
         board.forEachInterior(function (tile) { return interiorTileCount++; });
         board.forEach(function (tile) { if (tile.isBoundary())
@@ -538,7 +569,11 @@ var MapGenerator = /** @class */ (function () {
         if (numbers.length != resourceTileCount) {
             throw new Error("Check number distribution code: " + numbers.length + " " + resourceTileCount);
         }
-        var types = [TileType.Desert, TileType.Desert, TileType.Gold, TileType.Gold, TileType.Gold];
+        var types = []; //TileType.Desert, TileType.Desert, TileType.Gold, TileType.Gold, TileType.Gold];
+        for (var i = 0; i < desertCount; i++)
+            types.push(TileType.Desert);
+        for (var i = 0; i < goldCount; i++)
+            types.push(TileType.Gold);
         var typeNormalize = 0.8;
         var requiredTilesPerType = ~~(typeNormalize * (nonwaterTileCount - types.length) / resourceTileTypes.length);
         for (var i = 0; i < resourceTileTypes.length; i++) {
@@ -572,7 +607,7 @@ var MapGenerator = /** @class */ (function () {
             }
         });
         var allShorelines = board.getShorelines();
-        var numPorts = portTileTypesBag.length + 3;
+        var numPorts = portTileTypesBag.length + portCountPadding;
         var shorelines = [];
         for (var i = 0; i < numPorts; i++) {
             var s = allShorelines[~~(i * allShorelines.length / numPorts)];
@@ -803,9 +838,10 @@ var Application = /** @class */ (function () {
     Application.prototype.run = function () {
         this.context = this.canvas.getContext("2d");
         var boardGenerator = new BoardGenerator();
-        var board = boardGenerator.generateCircularBoard(4);
+        // var board = boardGenerator.generateWideBoard(4, 6);
+        var board = boardGenerator.generateWideBoard(4, 4);
         var mapGenerator = new MapGenerator();
-        mapGenerator.randomizeBoard(board, 0.2);
+        mapGenerator.randomizeBoard(board, 0.2, 8, 1, 2);
         var boardRenderer = new BoardRenderer(this.canvas, this.context);
         var scrollingGraph = new SlidingGraph(200, 100);
         var iterations = 0;
