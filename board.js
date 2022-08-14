@@ -222,6 +222,39 @@ var Board = /** @class */ (function () {
         });
         return shorelines;
     };
+    Board.prototype.getDisjointIslands = function (isLandElseWater) {
+        var _this = this;
+        var visited = new Set();
+        var result = [];
+        this.forEach(function (tile) {
+            if (visited.has(tile))
+                return;
+            if ((tile.getType() == TileType.Water) === isLandElseWater)
+                return;
+            var res = [];
+            _this.getDisjointIslandsHelper(isLandElseWater, tile, visited, res);
+            if (res.length == 0)
+                return; // todo why?
+            result.push(res);
+        });
+        return result;
+    };
+    Board.prototype.getDisjointIslandsHelper = function (isLandElseWater, current, visited, island) {
+        var _this = this;
+        if (current == null)
+            return;
+        if (visited.has(current))
+            return;
+        visited.add(current);
+        if ((current.getType() == TileType.Water) === isLandElseWater)
+            return;
+        island.push(current);
+        kNeighborOffsets.forEach(function (offset) {
+            var q = current.getPosition().offsetBy(offset);
+            var n = _this.getTileWithLocation(q);
+            _this.getDisjointIslandsHelper(isLandElseWater, n, visited, island);
+        });
+    };
     Board.prototype.getTileWithLocation = function (p) {
         return this.getTile(p.x, p.y, p.z);
     };
@@ -327,6 +360,7 @@ var Hex = /** @class */ (function () {
         this.boundary = boundary;
         this.type = TileType.Undefined;
         this.number = 0;
+        this.isPinned = false;
     }
     Hex.prototype.isBoundary = function () { return this.boundary; };
     Hex.prototype.getPosition = function () { return this.position; };
@@ -334,10 +368,13 @@ var Hex = /** @class */ (function () {
     Hex.prototype.setType = function (value) { this.type = value; };
     Hex.prototype.getNumber = function () { return this.number; };
     Hex.prototype.setNumber = function (value) { this.number = value; };
+    Hex.prototype.getIsPinned = function () { return this.isPinned; };
+    Hex.prototype.setIsPinned = function (value) { this.isPinned = value; };
     Hex.prototype.clone = function () {
         var newHex = new Hex(new GridLocation(this.position.x, this.position.y, this.position.z), this.boundary);
         newHex.setType(this.getType());
         newHex.setNumber(this.getNumber());
+        newHex.setIsPinned(this.getIsPinned());
         return newHex;
     };
     return Hex;
@@ -465,6 +502,14 @@ var BoardRenderer = /** @class */ (function () {
                 _this.context.textAlign = 'center';
                 _this.context.fillText(hex.getNumber().toString(), screenCoordinates.x, screenCoordinates.y + kTileSide + fontSize / 2);
                 _this.context.stroke();
+                if (hex.getIsPinned()) {
+                    _this.context.beginPath();
+                    _this.context.moveTo(screenCoordinates.x - 20, screenCoordinates.y + kTileSide + fontSize - 7);
+                    _this.context.lineTo(screenCoordinates.x, screenCoordinates.y + kTileSide - fontSize / 2 - 5);
+                    _this.context.lineTo(screenCoordinates.x + 20, screenCoordinates.y + kTileSide + fontSize - 7);
+                    _this.context.closePath();
+                    _this.context.stroke();
+                }
             }
             // Draw tiles lit by probability
             var weight = kWeightsByNumber[hex.getNumber()];
@@ -493,7 +538,7 @@ var BoardRenderer = /** @class */ (function () {
             var positionB = neighbor.getPosition().toScreenCoordinates();
             _this.context.setTransform(1, 0, 0, 1, 500, 500);
             _this.context.lineWidth = 3;
-            console.log(key + ": " + portType + " " + kTileColors[portType]);
+            //console.log(key + ": " + portType + " " + kTileColors[portType]);
             _this.context.strokeStyle = kTileColors[portType]; // "#000000";
             _this.context.beginPath();
             _this.context.moveTo(positionA.x * 0.8 + positionB.x * 0.2, positionA.y * 0.8 + positionB.y * 0.2 + kTileSide);
@@ -507,7 +552,7 @@ var BoardRenderer = /** @class */ (function () {
             _this.context.fillText(portType + " " + kTileLetters[portType], (positionA.x + positionB.x) / 2, (positionA.y + positionB.y) / 2 + kTileSide + fontSize / 2);
             _this.context.stroke();
         });
-        console.log("---");
+        //console.log("---");
     };
     BoardRenderer.prototype.hexPath = function (hex) {
         var position = hex.getPosition();
@@ -539,7 +584,7 @@ var IterationResult = /** @class */ (function () {
 var MapGenerator = /** @class */ (function () {
     function MapGenerator() {
     }
-    MapGenerator.prototype.randomizeBoard = function (board, interiorWaterFraction, portCountPadding, desertCount, goldCount) {
+    MapGenerator.prototype.randomizeBoard = function (board, interiorWaterFraction, portCountPadding, desertCount, goldCount, pinProbability) {
         if (interiorWaterFraction === void 0) { interiorWaterFraction = 0.0; }
         if (portCountPadding === void 0) { portCountPadding = 3; }
         if (desertCount === void 0) { desertCount = 2; }
@@ -605,6 +650,7 @@ var MapGenerator = /** @class */ (function () {
             else {
                 tile.setNumber(numbers[numberIndex++]);
             }
+            tile.setIsPinned(Math.random() <= pinProbability);
         });
         var allShorelines = board.getShorelines();
         var numPorts = portTileTypesBag.length + portCountPadding;
@@ -633,7 +679,8 @@ var MapGenerator = /** @class */ (function () {
             var clone = board.clone();
             var cloneTiles = clone.getTiles();
             var cloneInteriorTiles = clone.getInteriorTiles();
-            this.iterateBoardDispatcher(clone, cloneInteriorTiles);
+            var cloneInteriorUnpinnedTiles = cloneInteriorTiles.filter(function (hex) { return !hex.getIsPinned(); });
+            this.iterateBoardDispatcher(clone, cloneInteriorUnpinnedTiles);
             var cloneScore = this.scoreBoard(clone, cloneTiles, shorelines);
             if (cloneScore < bestScore) {
                 board = clone;
@@ -710,9 +757,9 @@ var MapGenerator = /** @class */ (function () {
             var portType = board.ports[key];
             if (!portType)
                 return;
-            var multiplier = 2.0;
+            var multiplier = 5.0;
             if (portType == hex.getType()) {
-                multiplier *= 1.5;
+                multiplier *= 2.5;
             }
             else if (portType == TileType.Wildcard) {
                 multiplier *= 1.2;
@@ -783,7 +830,7 @@ var MapGenerator = /** @class */ (function () {
         else if (aType === TileType.Sheep && (bType === TileType.Wheat || bType === TileType.Ore)) {
             multiplier = 1.2;
         }
-        if (a.getNumber() === b.getNumber() && distance === 1) {
+        if (a.getNumber() === b.getNumber() && distance < 1.001) {
             multiplier *= 20;
         }
         return 1 + multiplier * weight;
@@ -838,10 +885,21 @@ var Application = /** @class */ (function () {
     Application.prototype.run = function () {
         this.context = this.canvas.getContext("2d");
         var boardGenerator = new BoardGenerator();
-        // var board = boardGenerator.generateWideBoard(4, 6);
-        var board = boardGenerator.generateWideBoard(4, 4);
+        // var board = boardGenerator.generateWideBoard(4, 4);
+        var board = boardGenerator.generateWideBoard(4, 4.5); // 5 player seafarers with little water
+        // var board = boardGenerator.generateWideBoard(4, 5.5); // 5 player seafarers with a lot of water
+        // var board = boardGenerator.generateWideBoard(4, 6.5); // big seafarers
         var mapGenerator = new MapGenerator();
-        mapGenerator.randomizeBoard(board, 0.2, 8, 1, 2);
+        do {
+            mapGenerator.randomizeBoard(board, 0.2, 12, 0, 3, 0.1); // tiny seafarers tuned to have more water
+            // mapGenerator.randomizeBoard(board, 0.35, 12, 1, 3, 0.1); // tiny seafarers tuned to have more water
+            // mapGenerator.randomizeBoard(board, 0.25, 12, 1, 3, 0.1); // tiny seafarers tuned to have more water
+            // mapGenerator.randomizeBoard(board, 0.2, 12, 1, 3, 0.1); // tiny seafarers
+            // mapGenerator.randomizeBoard(board, 0.4, 12, 0, 3, 0.1); // big seafarers
+            // mapGenerator.randomizeBoard(board, 0.6, 12, 0, 3, 0.1); // big sparse seafarers
+        } while (
+        // false
+        board.getDisjointIslands(false).length > 1);
         var boardRenderer = new BoardRenderer(this.canvas, this.context);
         var scrollingGraph = new SlidingGraph(200, 100);
         var iterations = 0;

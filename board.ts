@@ -216,6 +216,36 @@ class Board {
        return shorelines;
     }
 
+   public getDisjointIslands(isLandElseWater: boolean): Hex[][] {
+     var visited = new Set<Hex>();
+     var result: Hex[][] = [];
+     this.forEach(tile => {
+       if (visited.has(tile)) return;
+       if ((tile.getType() == TileType.Water) === isLandElseWater) return;
+
+       var res: Hex[] = [];
+       this.getDisjointIslandsHelper(isLandElseWater, tile, visited, res);
+       if (res.length == 0) return; // todo why?
+       result.push(res);
+     });
+     return result;
+   }
+
+   private getDisjointIslandsHelper(isLandElseWater: boolean, current: Hex, visited: Set<Hex>, island: Hex[]): void {
+      if (current == null) return;
+      if (visited.has(current)) return;
+      visited.add(current);
+
+      if ((current.getType() == TileType.Water) === isLandElseWater) return;
+      island.push(current);
+
+      kNeighborOffsets.forEach(offset => {
+        const q = current.getPosition().offsetBy(offset);
+        const n = this.getTileWithLocation(q);
+        this.getDisjointIslandsHelper(isLandElseWater, n, visited, island);
+      })
+   }
+
    public getTileWithLocation(p: GridLocation) : Hex {
      return this.getTile(p.x, p.y, p.z);
    }
@@ -322,6 +352,7 @@ class BoardDimension<T> {
 class Hex {
    private type: TileType = TileType.Undefined;
    private number: number = 0;
+   private isPinned: boolean = false;
 
    constructor(private position: GridLocation, private boundary: Boolean) { }
 
@@ -331,11 +362,14 @@ class Hex {
    public setType(value: TileType): void { this.type = value; }
    public getNumber(): number { return this.number; }
    public setNumber(value: number): void { this.number = value; }
+   public getIsPinned(): boolean { return this.isPinned; }
+   public setIsPinned(value: boolean): void { this.isPinned = value; }
 
    public clone(): Hex {
       var newHex = new Hex(new GridLocation(this.position.x, this.position.y, this.position.z), this.boundary);
       newHex.setType(this.getType());
       newHex.setNumber(this.getNumber());
+      newHex.setIsPinned(this.getIsPinned());
       return newHex;
    }
 }
@@ -475,6 +509,15 @@ class BoardRenderer {
                this.context.textAlign = 'center';
                this.context.fillText(hex.getNumber().toString(), screenCoordinates.x, screenCoordinates.y + kTileSide + fontSize / 2);
                this.context.stroke();
+
+               if (hex.getIsPinned()) {
+                 this.context.beginPath();
+                 this.context.moveTo(screenCoordinates.x - 20, screenCoordinates.y + kTileSide + fontSize - 7);
+                 this.context.lineTo(screenCoordinates.x, screenCoordinates.y + kTileSide - fontSize / 2 - 5);
+                 this.context.lineTo(screenCoordinates.x + 20, screenCoordinates.y + kTileSide + fontSize - 7);
+                 this.context.closePath();
+                 this.context.stroke();
+               }
             }
 
             // Draw tiles lit by probability
@@ -507,7 +550,7 @@ class BoardRenderer {
 
         this.context.setTransform(1, 0, 0, 1, 500, 500);
         this.context.lineWidth = 3;
-        console.log(key + ": " + portType + " " + kTileColors[portType]);
+        //console.log(key + ": " + portType + " " + kTileColors[portType]);
         this.context.strokeStyle = kTileColors[portType]; // "#000000";
         this.context.beginPath();
         this.context.moveTo(positionA.x * 0.8 + positionB.x * 0.2, positionA.y * 0.8 + positionB.y * 0.2 + kTileSide);
@@ -522,7 +565,7 @@ class BoardRenderer {
         this.context.fillText(portType + " " + kTileLetters[portType], (positionA.x + positionB.x) / 2, (positionA.y + positionB.y) / 2 + kTileSide + fontSize / 2);
         this.context.stroke();
       })
-      console.log("---");
+      //console.log("---");
    }
 
    hexPath(hex: Hex) {
@@ -553,7 +596,7 @@ class IterationResult {
 }
 
 class MapGenerator {
-   public randomizeBoard(board: Board, interiorWaterFraction: number = 0.0, portCountPadding: number = 3, desertCount: number = 2, goldCount: number = 3): void {
+   public randomizeBoard(board: Board, interiorWaterFraction: number = 0.0, portCountPadding: number = 3, desertCount: number = 2, goldCount: number = 3, pinProbability): void {
       var interiorTileCount = 0;
       board.forEachInterior(tile => interiorTileCount++);
       board.forEach(tile => { if (tile.isBoundary()) tile.setType(TileType.Water); });
@@ -599,7 +642,6 @@ class MapGenerator {
          throw new Error("Check nonwater distribution code: " + types.length + " " + nonwaterTileCount);
       }
 
-
       shuffle(numbers);
       shuffle(types);
       for (var i = 0; i < waterTileCount; i++) {
@@ -620,6 +662,7 @@ class MapGenerator {
             } else {
                tile.setNumber(numbers[numberIndex++]);
             }
+            tile.setIsPinned(Math.random() <= pinProbability);
          });
 
 
@@ -654,7 +697,8 @@ class MapGenerator {
          var clone = board.clone();
          var cloneTiles = clone.getTiles();
          var cloneInteriorTiles = clone.getInteriorTiles();
-         this.iterateBoardDispatcher(clone, cloneInteriorTiles);
+         var cloneInteriorUnpinnedTiles = cloneInteriorTiles.filter(hex => !hex.getIsPinned());
+         this.iterateBoardDispatcher(clone, cloneInteriorUnpinnedTiles);
          var cloneScore = this.scoreBoard(clone, cloneTiles, shorelines);
 
          if (cloneScore < bestScore) {
@@ -743,9 +787,9 @@ class MapGenerator {
         const portType = board.ports[key];
         if (!portType) return;
 
-        let multiplier = 2.0;
+        let multiplier = 5.0;
         if (portType == hex.getType()) {
-          multiplier *= 1.5;
+          multiplier *= 2.5;
         } else if (portType == TileType.Wildcard) {
           multiplier *= 1.2;
         }
@@ -809,7 +853,7 @@ class MapGenerator {
          multiplier = 1.2;
       }
 
-      if (a.getNumber() === b.getNumber() && distance === 1) {
+      if (a.getNumber() === b.getNumber() && distance < 1.001) {
          multiplier *= 20;
       }
       return 1 + multiplier * weight;
@@ -869,10 +913,24 @@ class Application {
       this.context = this.canvas.getContext("2d");
 
       var boardGenerator = new BoardGenerator();
-      // var board = boardGenerator.generateWideBoard(4, 6);
-      var board = boardGenerator.generateWideBoard(4, 4);
+      // var board = boardGenerator.generateWideBoard(4, 4);
+      var board = boardGenerator.generateWideBoard(4, 4.5); // 5 player seafarers with little water
+      // var board = boardGenerator.generateWideBoard(4, 5.5); // 5 player seafarers with a lot of water
+      // var board = boardGenerator.generateWideBoard(4, 6.5); // big seafarers
       var mapGenerator = new MapGenerator();
-      mapGenerator.randomizeBoard(board, 0.2, 8, 1, 2);
+      do {
+        mapGenerator.randomizeBoard(board, 0.2, 12, 0, 3, 0.1); // tiny seafarers tuned to have more water
+        // mapGenerator.randomizeBoard(board, 0.35, 12, 1, 3, 0.1); // tiny seafarers tuned to have more water
+        // mapGenerator.randomizeBoard(board, 0.25, 12, 1, 3, 0.1); // tiny seafarers tuned to have more water
+        // mapGenerator.randomizeBoard(board, 0.2, 12, 1, 3, 0.1); // tiny seafarers
+        // mapGenerator.randomizeBoard(board, 0.4, 12, 0, 3, 0.1); // big seafarers
+        // mapGenerator.randomizeBoard(board, 0.6, 12, 0, 3, 0.1); // big sparse seafarers
+      } while (
+        // false
+        board.getDisjointIslands(false).length > 1
+      );
+
+
       var boardRenderer = new BoardRenderer(this.canvas, this.context);
       var scrollingGraph = new SlidingGraph(200, 100);
 

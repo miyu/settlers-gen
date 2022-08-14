@@ -1,0 +1,1 @@
+tsc board.ts --lib es6,dom
